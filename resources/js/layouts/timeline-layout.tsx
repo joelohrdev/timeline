@@ -26,10 +26,11 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
                 <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:h-20">
                     <Link
                         href={home()}
-                        className="flex items-center gap-2 rounded-sm font-display text-2xl tracking-tight focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-4 focus-visible:ring-offset-paper focus-visible:outline-none"
+                        aria-label={name}
+                        title={name}
+                        className="rounded-sm focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-4 focus-visible:ring-offset-paper focus-visible:outline-none"
                     >
-                        <AppLogoIcon className="size-7 text-ink" />
-                        {name}
+                        <AppLogoIcon className="size-10 text-ink" />
                     </Link>
 
                     {user ? (
