@@ -1,9 +1,12 @@
 import { Head, InfiniteScroll, Link, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BackToTop } from '@/components/back-to-top';
 import { DaySheet } from '@/components/day-sheet';
 import { FindDay } from '@/components/find-day';
 import { MonthCalendar } from '@/components/month-calendar';
+import { dayElementId, timelineSections } from '@/components/timeline-list';
+import { useTimelineView, ViewToggle } from '@/components/view-toggle';
+import type { TimelineView } from '@/components/view-toggle';
 import { OnThisDay } from '@/components/on-this-day';
 import type { OnThisDayEvent } from '@/components/on-this-day';
 import {
@@ -26,6 +29,16 @@ import type {
     SelectOption,
     User,
 } from '@/types';
+
+function ListSkeleton() {
+    return (
+        <div className="mx-auto max-w-2xl pb-16">
+            <Skeleton className="mb-4 h-6 w-56 bg-cell" />
+            <Skeleton className="aspect-[3/2] w-full rounded-md bg-cell" />
+            <Skeleton className="mt-6 h-4 w-4/5 bg-cell" />
+        </div>
+    );
+}
 
 function CalendarSkeleton() {
     return (
@@ -81,6 +94,7 @@ export default function Timeline({
     const user = usePage().props.auth.user as User | null;
     const [openDate, setOpenDate] = useState<string | null>(null);
     const [handledJump, setHandledJump] = useState<string | null>(null);
+    const [view, setView] = useTimelineView();
     const filters: TimelineFilters = { date: jumpedTo, category, search };
     const isFiltered =
         jumpedTo !== null || category !== null || search !== null;
@@ -91,8 +105,28 @@ export default function Timeline({
 
     if (jumpedTo !== handledJump) {
         setHandledJump(jumpedTo);
-        setOpenDate(jumpedEntry ? jumpedDay : null);
+        setOpenDate(jumpedEntry && view === 'calendar' ? jumpedDay : null);
     }
+
+    useEffect(() => {
+        if (view !== 'timeline' || !jumpedDay) {
+            return;
+        }
+
+        const reduceMotion = window.matchMedia(
+            '(prefers-reduced-motion: reduce)',
+        ).matches;
+
+        document.getElementById(dayElementId(jumpedDay))?.scrollIntoView({
+            behavior: reduceMotion ? 'auto' : 'smooth',
+            block: 'start',
+        });
+    }, [view, jumpedDay]);
+
+    const changeView = (next: TimelineView) => {
+        setOpenDate(null);
+        setView(next);
+    };
 
     if (entries.data.length === 0 && !isFiltered) {
         return (
@@ -127,6 +161,7 @@ export default function Timeline({
                 )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+                <ViewToggle view={view} onChange={changeView} />
                 <SearchBox filters={filters} />
                 <CategoryFilter filters={filters} categories={categories} />
                 <FindDay firstDate={firstDate} filters={filters} />
@@ -167,27 +202,47 @@ export default function Timeline({
                 data="entries"
                 buffer={800}
                 preserveUrl
-                loading={<CalendarSkeleton />}
+                loading={
+                    view === 'calendar' ? (
+                        <CalendarSkeleton />
+                    ) : (
+                        <ListSkeleton />
+                    )
+                }
             >
-                {groupByMonth(entries.data).map(([month, monthEntries]) => (
-                    <MonthCalendar
-                        key={month}
-                        month={month}
-                        entries={monthEntries}
-                        highlightDate={jumpedDay}
-                        onOpen={setOpenDate}
-                    />
-                ))}
+                {view === 'calendar'
+                    ? groupByMonth(entries.data).map(
+                          ([month, monthEntries]) => (
+                              <MonthCalendar
+                                  key={month}
+                                  month={month}
+                                  entries={monthEntries}
+                                  highlightDate={jumpedDay}
+                                  onOpen={setOpenDate}
+                              />
+                          ),
+                      )
+                    : timelineSections({
+                          entries: entries.data,
+                          userId: user?.id ?? null,
+                          highlightDate: jumpedDay,
+                      })}
             </InfiniteScroll>
 
-            <DaySheet
-                date={openIndex === -1 ? null : openDate}
-                events={entries.data.filter((entry) => entry.date === openDate)}
-                userId={user?.id ?? null}
-                newer={openIndex > 0 ? days[openIndex - 1] : null}
-                older={openIndex === -1 ? null : (days[openIndex + 1] ?? null)}
-                onNavigate={setOpenDate}
-            />
+            {view === 'calendar' && (
+                <DaySheet
+                    date={openIndex === -1 ? null : openDate}
+                    events={entries.data.filter(
+                        (entry) => entry.date === openDate,
+                    )}
+                    userId={user?.id ?? null}
+                    newer={openIndex > 0 ? days[openIndex - 1] : null}
+                    older={
+                        openIndex === -1 ? null : (days[openIndex + 1] ?? null)
+                    }
+                    onNavigate={setOpenDate}
+                />
+            )}
 
             <BackToTop />
         </>
