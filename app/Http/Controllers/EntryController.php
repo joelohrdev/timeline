@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\CreateEntry;
 use App\Actions\StoreEntryImage;
 use App\EntryCategory;
 use App\Holiday;
@@ -9,6 +10,7 @@ use App\Http\Requests\StoreEntryRequest;
 use App\Http\Requests\UpdateEntryRequest;
 use App\Models\Entry;
 use App\Models\EntryImage;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -26,11 +28,7 @@ class EntryController extends Controller
     {
         return Inertia::render('entries/create', [
             'today' => $this->requestedDay($request) ?? now()->toDateString(),
-            'postedDays' => $request->user()->entries()
-                ->inDayOrder()
-                ->get()
-                ->groupBy(fn (Entry $entry): string => $entry->date->toDateString())
-                ->map(fn ($entries) => $this->distinctLabels($entries)),
+            'postedDays' => $this->postedDaysFor($request->user()),
             ...$this->categoryOptions(),
         ]);
     }
@@ -38,16 +36,15 @@ class EntryController extends Controller
     /**
      * Store a new entry and convert its images to WebP.
      */
-    public function store(StoreEntryRequest $request, StoreEntryImage $storeEntryImage): RedirectResponse
+    public function store(StoreEntryRequest $request, CreateEntry $createEntry): RedirectResponse
     {
-        DB::transaction(function () use ($request, $storeEntryImage): void {
-            $entry = $request->user()->entries()->create([
-                ...$request->safe()->only(['date', 'title', 'location_place', 'location_city', 'location_state', 'body']),
-                ...$request->categoryAttributes(),
-            ]);
-
-            $uploaded = $storeEntryImage->handleMany(
-                $entry,
+        DB::transaction(function () use ($request, $createEntry): void {
+            [$entry, $uploaded] = $createEntry->handle(
+                $request->user(),
+                [
+                    ...$request->safe()->only(['date', 'title', 'location_place', 'location_city', 'location_state', 'body']),
+                    ...$request->categoryAttributes(),
+                ],
                 $request->file('images', []),
                 $request->input('fingerprints', []),
                 $request->input('taken_keys', []),
@@ -114,6 +111,20 @@ class EntryController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Entry deleted.')]);
 
         return to_route('home');
+    }
+
+    /**
+     * The user's events grouped by day, for the "you already have an event" prompts.
+     *
+     * @return Collection<string, list<array{id: int, label: string}>>
+     */
+    public function postedDaysFor(User $user): Collection
+    {
+        return $user->entries()
+            ->inDayOrder()
+            ->get()
+            ->groupBy(fn (Entry $entry): string => $entry->date->toDateString())
+            ->map(fn ($entries) => $this->distinctLabels($entries));
     }
 
     /**

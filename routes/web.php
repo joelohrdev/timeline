@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\EntryImageController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\PhotoCheckController;
 use App\Http\Controllers\PlaceLookupController;
 use App\Http\Controllers\TimelineController;
@@ -13,6 +14,9 @@ Route::get('years/{year}', YearController::class)->whereNumber('year')->name('ye
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('dashboard', '/')->name('dashboard');
+
+    Route::get('entries/import', [ImportController::class, 'create'])->name('entries.import');
+    Route::post('entries/import', [ImportController::class, 'store'])->name('entries.import.store');
 
     Route::resource('entries', EntryController::class)->except(['index', 'show']);
 

@@ -1,7 +1,8 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import EntryController from '@/actions/App/Http/Controllers/EntryController';
 import type { CategoryOptions } from '@/components/category-fields';
 import { EntryForm } from '@/components/entry-form';
+import { importMethod } from '@/routes/entries';
 import type { PostedEvent } from '@/components/entry-form';
 
 export default function CreateEntry({
@@ -16,9 +17,16 @@ export default function CreateEntry({
     return (
         <div className="max-w-xl">
             <Head title="New entry" />
-            <h1 className="mb-8 font-display text-4xl tracking-tight">
-                New entry
-            </h1>
+            <h1 className="font-display text-4xl tracking-tight">New entry</h1>
+            <p className="mt-2 mb-8 text-sm text-muted-foreground">
+                Catching up on older photos?{' '}
+                <Link
+                    href={importMethod()}
+                    className="text-foreground underline underline-offset-4 hover:no-underline"
+                >
+                    Import a batch by day
+                </Link>
+            </p>
             <EntryForm
                 form={EntryController.store.form()}
                 defaultDate={today}
