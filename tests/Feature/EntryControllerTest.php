@@ -247,3 +247,52 @@ test('an entry is not saved when its image cannot be written to storage', functi
     expect(Entry::count())->toBe(0)
         ->and(EntryImage::count())->toBe(0);
 });
+
+test('a newly uploaded photo chosen as the cover moves to the front', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [
+                UploadedFile::fake()->image('first.jpg', 100, 100),
+                UploadedFile::fake()->image('second.jpg', 200, 100),
+                UploadedFile::fake()->image('third.jpg', 300, 100),
+            ],
+            'cover' => 'upload:2',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->images->pluck('width')->all())->toBe([300, 100, 200]);
+});
+
+test('an existing photo chosen as the cover moves to the front', function () {
+    $entry = Entry::factory()->create(['date' => '2026-10-17']);
+    $first = EntryImage::factory()->for($entry)->create(['position' => 0]);
+    $second = EntryImage::factory()->for($entry)->create(['position' => 1]);
+    $third = EntryImage::factory()->for($entry)->create(['position' => 2]);
+
+    $this->actingAs($entry->user)
+        ->put(route('entries.update', $entry), ['date' => '2026-10-17', 'cover' => "image:{$third->id}"])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->images()->pluck('id')->all())->toBe([$third->id, $first->id, $second->id]);
+});
+
+test('a photo from another entry cannot be made the cover', function () {
+    $entry = Entry::factory()->create(['date' => '2026-10-17']);
+    $first = EntryImage::factory()->for($entry)->create(['position' => 0]);
+    $second = EntryImage::factory()->for($entry)->create(['position' => 1]);
+    $otherImage = EntryImage::factory()->create();
+
+    $this->actingAs($entry->user)
+        ->put(route('entries.update', $entry), ['date' => '2026-10-17', 'cover' => "image:{$otherImage->id}"])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->images()->pluck('id')->all())->toBe([$first->id, $second->id])
+        ->and($otherImage->fresh()->position)->toBe(0);
+});
+
+test('a malformed cover choice is rejected', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'cover' => 'banana'])
+        ->assertSessionHasErrors('cover');
+});

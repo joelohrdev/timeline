@@ -23,6 +23,7 @@ class StoreEntryRequest extends FormRequest
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'cover' => ['nullable', 'string', 'regex:/^(image|upload):\d+$/'],
             ...$this->categoryRules(),
         ];
     }

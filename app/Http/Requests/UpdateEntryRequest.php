@@ -38,6 +38,7 @@ class UpdateEntryRequest extends FormRequest
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:'.max(0, 10 - $entry->images()->count())],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'cover' => ['nullable', 'string', 'regex:/^(image|upload):\d+$/'],
             ...$this->categoryRules(),
         ];
     }

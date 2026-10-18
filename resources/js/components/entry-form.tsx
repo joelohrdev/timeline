@@ -1,5 +1,5 @@
 import { Form, router } from '@inertiajs/react';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus, Star, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CategoryFields } from '@/components/category-fields';
 import type { CategoryOptions } from '@/components/category-fields';
@@ -8,6 +8,7 @@ import InputError from '@/components/input-error';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
@@ -28,12 +29,26 @@ export function EntryForm({
     holidays,
 }: Props) {
     const [previews, setPreviews] = useState<string[]>([]);
+    const [cover, setCover] = useState<string | null>(null);
+    const existingImages = entry?.images ?? [];
+    const effectiveCover =
+        cover ??
+        (existingImages[0]
+            ? `image:${existingImages[0].id}`
+            : previews.length > 0
+              ? 'upload:0'
+              : null);
+    const photoCount = existingImages.length + previews.length;
 
     useEffect(() => {
         return () => previews.forEach((url) => URL.revokeObjectURL(url));
     }, [previews]);
 
     const selectFiles = (files: FileList | null) => {
+        if (cover?.startsWith('upload:')) {
+            setCover(null);
+        }
+
         setPreviews(
             Array.from(files ?? []).map((file) => URL.createObjectURL(file)),
         );
@@ -42,6 +57,10 @@ export function EntryForm({
     const removeImage = (imageId: number) => {
         if (!entry || !window.confirm('Remove this image?')) {
             return;
+        }
+
+        if (cover === `image:${imageId}`) {
+            setCover(null);
         }
 
         router.delete(destroyImage({ entry: entry.id, image: imageId }), {
@@ -53,7 +72,10 @@ export function EntryForm({
         <Form
             {...form}
             options={{ preserveScroll: 'errors' }}
-            onSuccess={() => setPreviews([])}
+            onSuccess={() => {
+                setPreviews([]);
+                setCover(null);
+            }}
             className="space-y-6"
         >
             {({ processing, progress, errors }) => (
@@ -90,14 +112,19 @@ export function EntryForm({
                     <div className="grid gap-2">
                         <Label htmlFor="images">Photos</Label>
 
-                        {entry && entry.images.length > 0 && (
+                        {photoCount > 0 && (
                             <div className="grid grid-cols-4 gap-2">
-                                {entry.images.map((image) => (
+                                {existingImages.map((image) => (
                                     <div key={image.id} className="relative">
-                                        <img
+                                        <CoverTile
                                             src={image.thumb_url}
-                                            alt=""
-                                            className="aspect-square w-full rounded-md object-cover"
+                                            isCover={
+                                                effectiveCover ===
+                                                `image:${image.id}`
+                                            }
+                                            onSelect={() =>
+                                                setCover(`image:${image.id}`)
+                                            }
                                         />
                                         <button
                                             type="button"
@@ -111,8 +138,27 @@ export function EntryForm({
                                         </button>
                                     </div>
                                 ))}
+                                {previews.map((url, index) => (
+                                    <CoverTile
+                                        key={url}
+                                        src={url}
+                                        isCover={
+                                            effectiveCover === `upload:${index}`
+                                        }
+                                        onSelect={() =>
+                                            setCover(`upload:${index}`)
+                                        }
+                                    />
+                                ))}
                             </div>
                         )}
+
+                        {photoCount > 1 && (
+                            <p className="text-sm text-muted-foreground">
+                                Tap a photo to make it the cover.
+                            </p>
+                        )}
+                        <input type="hidden" name="cover" value={cover ?? ''} />
 
                         <label
                             htmlFor="images"
@@ -136,20 +182,8 @@ export function EntryForm({
                             className="sr-only"
                         />
 
-                        {previews.length > 0 && (
-                            <div className="grid grid-cols-4 gap-2">
-                                {previews.map((url) => (
-                                    <img
-                                        key={url}
-                                        src={url}
-                                        alt=""
-                                        className="aspect-square w-full rounded-md object-cover"
-                                    />
-                                ))}
-                            </div>
-                        )}
-
                         <InputError message={errors.images} />
+                        <InputError message={errors.cover} />
                         {Object.entries(errors)
                             .filter(([key]) => key.startsWith('images.'))
                             .slice(0, 1)
@@ -172,5 +206,41 @@ export function EntryForm({
                 </>
             )}
         </Form>
+    );
+}
+
+function CoverTile({
+    src,
+    isCover,
+    onSelect,
+}: {
+    src: string;
+    isCover: boolean;
+    onSelect: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            aria-pressed={isCover}
+            aria-label={isCover ? 'Cover photo' : 'Make this the cover photo'}
+            className={cn(
+                'relative block w-full cursor-pointer overflow-hidden rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                isCover &&
+                    'ring-2 ring-foreground ring-offset-2 ring-offset-background',
+            )}
+        >
+            <img
+                src={src}
+                alt=""
+                className="aspect-square w-full object-cover"
+            />
+            {isCover && (
+                <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background">
+                    <Star className="size-3 fill-current" />
+                    Cover
+                </span>
+            )}
+        </button>
     );
 }

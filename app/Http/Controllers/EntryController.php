@@ -8,6 +8,7 @@ use App\Holiday;
 use App\Http\Requests\StoreEntryRequest;
 use App\Http\Requests\UpdateEntryRequest;
 use App\Models\Entry;
+use App\Models\EntryImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,9 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+            $uploaded = $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+
+            $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Entry posted.')]);
@@ -71,7 +74,9 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+            $uploaded = $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+
+            $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Entry updated.')]);
@@ -108,13 +113,44 @@ class EntryController extends Controller
 
     /**
      * @param  array<int, UploadedFile>  $files
+     * @return list<EntryImage>
      */
-    private function storeImages(Entry $entry, array $files, StoreEntryImage $storeEntryImage): void
+    private function storeImages(Entry $entry, array $files, StoreEntryImage $storeEntryImage): array
     {
         $nextPosition = (int) $entry->images()->max('position') + ($entry->images()->exists() ? 1 : 0);
+        $uploaded = [];
 
         foreach (array_values($files) as $offset => $file) {
-            $storeEntryImage->handle($entry, $file, $nextPosition + $offset);
+            $uploaded[] = $storeEntryImage->handle($entry, $file, $nextPosition + $offset);
         }
+
+        return $uploaded;
+    }
+
+    /**
+     * Move the chosen cover photo to the front, keeping the others in order.
+     *
+     * The choice is "image:{id}" for a photo already on the entry or "upload:{index}" for one uploaded in this request.
+     *
+     * @param  list<EntryImage>  $uploaded
+     */
+    private function applyCover(Entry $entry, ?string $cover, array $uploaded): void
+    {
+        [$source, $key] = explode(':', $cover ?? ':') + [null, null];
+
+        $coverImage = match ($source) {
+            'upload' => $uploaded[(int) $key] ?? null,
+            'image' => $entry->images()->find((int) $key),
+            default => null,
+        };
+
+        if ($coverImage === null) {
+            return;
+        }
+
+        $entry->images()->get()
+            ->sortBy(fn (EntryImage $image): int => $image->is($coverImage) ? -1 : $image->position)
+            ->values()
+            ->each(fn (EntryImage $image, int $position) => $image->update(['position' => $position]));
     }
 }
