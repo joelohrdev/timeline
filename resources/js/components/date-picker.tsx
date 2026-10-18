@@ -12,13 +12,14 @@ import {
 type Props = {
     id: string;
     name: string;
-    defaultValue: string;
+    value: string;
+    onChange: (value: string) => void;
     invalid?: boolean;
 };
 
-export function DatePicker({ id, name, defaultValue, invalid }: Props) {
+export function DatePicker({ id, name, value, onChange, invalid }: Props) {
     const [open, setOpen] = useState(false);
-    const [selected, setSelected] = useState<Date>(parseISO(defaultValue));
+    const selected = parseISO(value);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -42,16 +43,12 @@ export function DatePicker({ id, name, defaultValue, invalid }: Props) {
                     defaultMonth={selected}
                     captionLayout="dropdown"
                     onSelect={(date) => {
-                        setSelected(date);
+                        onChange(format(date, 'yyyy-MM-dd'));
                         setOpen(false);
                     }}
                 />
             </PopoverContent>
-            <input
-                type="hidden"
-                name={name}
-                value={format(selected, 'yyyy-MM-dd')}
-            />
+            <input type="hidden" name={name} value={value} />
         </Popover>
     );
 }

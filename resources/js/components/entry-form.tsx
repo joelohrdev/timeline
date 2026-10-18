@@ -1,6 +1,6 @@
 import { Form, router } from '@inertiajs/react';
 import { ImagePlus, Star, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CategoryFields } from '@/components/category-fields';
 import type { CategoryOptions } from '@/components/category-fields';
 import { DatePicker } from '@/components/date-picker';
@@ -8,6 +8,7 @@ import InputError from '@/components/input-error';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { photoTakenDate } from '@/lib/photo-date';
 import { cn } from '@/lib/utils';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
@@ -30,6 +31,9 @@ export function EntryForm({
 }: Props) {
     const [previews, setPreviews] = useState<string[]>([]);
     const [cover, setCover] = useState<string | null>(null);
+    const [date, setDate] = useState(entry?.date ?? defaultDate);
+    const [dateFromPhoto, setDateFromPhoto] = useState<string | null>(null);
+    const latestSelection = useRef(0);
     const existingImages = entry?.images ?? [];
     const effectiveCover =
         cover ??
@@ -49,9 +53,35 @@ export function EntryForm({
             setCover(null);
         }
 
-        setPreviews(
-            Array.from(files ?? []).map((file) => URL.createObjectURL(file)),
-        );
+        const selected = Array.from(files ?? []);
+
+        setPreviews(selected.map((file) => URL.createObjectURL(file)));
+
+        if (!entry) {
+            void setDateFromFirstPhoto(selected);
+        }
+    };
+
+    /**
+     * On a new entry, use the day the first dated photo was taken.
+     */
+    const setDateFromFirstPhoto = async (selected: File[]) => {
+        const selection = ++latestSelection.current;
+
+        for (const file of selected) {
+            const taken = await photoTakenDate(file);
+
+            if (selection !== latestSelection.current) {
+                return;
+            }
+
+            if (taken) {
+                setDate(taken);
+                setDateFromPhoto(taken);
+
+                return;
+            }
+        }
     };
 
     const removeImage = (imageId: number) => {
@@ -85,9 +115,15 @@ export function EntryForm({
                         <DatePicker
                             id="date"
                             name="date"
-                            defaultValue={entry?.date ?? defaultDate}
+                            value={date}
+                            onChange={setDate}
                             invalid={Boolean(errors.date)}
                         />
+                        {dateFromPhoto === date && (
+                            <p className="text-sm text-muted-foreground">
+                                Set from when your photo was taken.
+                            </p>
+                        )}
                         <InputError message={errors.date} />
                     </div>
 
