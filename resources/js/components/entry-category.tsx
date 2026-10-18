@@ -1,20 +1,21 @@
-import {
-    Cake,
-    Clover,
-    Egg,
-    Flag,
-    Flower2,
-    Ghost,
-    Glasses,
-    HardHat,
-    Heart,
-    PartyPopper,
-    Sparkles,
-    Sunrise,
-    TreePine,
-    Wheat,
-} from 'lucide-react';
 import type { ComponentType } from 'react';
+import {
+    BaseballIcon,
+    BurgerIcon,
+    CakeIcon,
+    ChristmasTreeIcon,
+    EasterEggIcon,
+    FireworksIcon,
+    FlagIcon,
+    HeartIcon,
+    NecktieIcon,
+    PartyPopperIcon,
+    PumpkinIcon,
+    ShamrockIcon,
+    SunriseIcon,
+    TulipIcon,
+    TurkeyIcon,
+} from '@/components/category-icons';
 import { cn } from '@/lib/utils';
 import type { Entry, Holiday } from '@/types';
 
@@ -24,95 +25,77 @@ export type Theme = {
     accent: string;
 };
 
-function BaseballIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className={className}
-            aria-hidden="true"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M6.5 4.4a10 10 0 0 1 0 15.2" />
-            <path d="M17.5 4.4a10 10 0 0 0 0 15.2" />
-        </svg>
-    );
-}
-
 const holidayThemes: Record<Holiday, Theme> = {
     new_years_day: {
         label: "New Year's Day",
-        icon: Sunrise,
+        icon: SunriseIcon,
         accent: 'text-amber-500 dark:text-amber-400',
     },
     valentines_day: {
         label: "Valentine's Day",
-        icon: Heart,
+        icon: HeartIcon,
         accent: 'text-rose-600 dark:text-rose-400',
     },
     st_patricks_day: {
         label: "St. Patrick's Day",
-        icon: Clover,
+        icon: ShamrockIcon,
         accent: 'text-emerald-600 dark:text-emerald-400',
     },
     easter: {
         label: 'Easter',
-        icon: Egg,
+        icon: EasterEggIcon,
         accent: 'text-violet-500 dark:text-violet-400',
     },
     mothers_day: {
         label: "Mother's Day",
-        icon: Flower2,
+        icon: TulipIcon,
         accent: 'text-pink-500 dark:text-pink-400',
     },
     memorial_day: {
         label: 'Memorial Day',
-        icon: Flag,
+        icon: FlagIcon,
         accent: 'text-slate-500 dark:text-slate-400',
     },
     fathers_day: {
         label: "Father's Day",
-        icon: Glasses,
+        icon: NecktieIcon,
         accent: 'text-sky-600 dark:text-sky-400',
     },
     independence_day: {
         label: '4th of July',
-        icon: Sparkles,
+        icon: FireworksIcon,
         accent: 'text-blue-700 dark:text-blue-400',
     },
     labor_day: {
         label: 'Labor Day',
-        icon: HardHat,
+        icon: BurgerIcon,
         accent: 'text-yellow-600 dark:text-yellow-400',
     },
     halloween: {
         label: 'Halloween',
-        icon: Ghost,
+        icon: PumpkinIcon,
         accent: 'text-orange-500 dark:text-orange-400',
     },
     thanksgiving: {
         label: 'Thanksgiving',
-        icon: Wheat,
+        icon: TurkeyIcon,
         accent: 'text-amber-700 dark:text-amber-500',
     },
     christmas: {
         label: 'Christmas',
-        icon: TreePine,
+        icon: ChristmasTreeIcon,
         accent: 'text-red-600 dark:text-red-400',
     },
     new_years_eve: {
         label: "New Year's Eve",
-        icon: PartyPopper,
+        icon: PartyPopperIcon,
         accent: 'text-indigo-500 dark:text-indigo-400',
     },
 };
 
 const birthdayTheme: Theme = {
     label: 'Birthday',
-    icon: Cake,
+    icon: CakeIcon,
     accent: 'text-fuchsia-600 dark:text-fuchsia-400',
 };
 
@@ -184,7 +167,7 @@ export function EntryCategoryLine({
                 className,
             )}
         >
-            <Icon className="size-4 shrink-0" />
+            <Icon className="size-5 shrink-0" />
             <span className="text-ink">{categoryHeadline(entry, theme)}</span>
         </p>
     );

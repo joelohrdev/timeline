@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { categoryIcons, FireworksIcon } from '@/components/category-icons';
 import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +23,16 @@ type Props = CategoryOptions & {
 };
 
 const noCategory = 'none';
+
+/**
+ * The illustration for a category or holiday choice in the pickers.
+ */
+function OptionIcon({ name }: { name: string }) {
+    const Icon =
+        name === 'holiday' ? FireworksIcon : (categoryIcons[name] ?? null);
+
+    return Icon ? <Icon className="size-5" /> : null;
+}
 
 export function CategoryFields({ categories, holidays, entry, errors }: Props) {
     const [category, setCategory] = useState<EntryCategory | ''>(
@@ -57,6 +68,7 @@ export function CategoryFields({ categories, holidays, entry, errors }: Props) {
                         <SelectItem value={noCategory}>None</SelectItem>
                         {categories.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
+                                <OptionIcon name={option.value} />
                                 {option.label}
                             </SelectItem>
                         ))}
@@ -86,6 +98,7 @@ export function CategoryFields({ categories, holidays, entry, errors }: Props) {
                                     key={option.value}
                                     value={option.value}
                                 >
+                                    <OptionIcon name={option.value} />
                                     {option.label}
                                 </SelectItem>
                             ))}

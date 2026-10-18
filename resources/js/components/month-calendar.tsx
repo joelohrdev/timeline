@@ -40,11 +40,11 @@ function CategoryMarker({ entry }: { entry: Entry }) {
     return (
         <span
             className={cn(
-                'absolute right-1 bottom-1 grid size-4 place-items-center rounded-full bg-paper shadow-sm sm:right-1.5 sm:bottom-1.5 sm:size-6',
+                'absolute right-1 bottom-1 grid size-5 place-items-center rounded-full bg-paper shadow-sm sm:right-1.5 sm:bottom-1.5 sm:size-8',
                 theme.accent,
             )}
         >
-            <Icon className="size-2.5 sm:size-3.5" />
+            <Icon className="size-3.5 sm:size-5.5" />
             <span className="sr-only">{theme.label}</span>
         </span>
     );
