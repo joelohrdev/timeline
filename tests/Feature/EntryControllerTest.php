@@ -4,8 +4,10 @@ use App\EntryCategory;
 use App\Models\Entry;
 use App\Models\EntryImage;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->disk = Storage::fake(config('filesystems.media_disk'));
@@ -219,4 +221,12 @@ test('clearing the category removes its fields', function () {
 
     expect($entry->refresh()->category)->toBeNull()
         ->and($entry->details)->toBeNull();
+});
+
+test('the new entry form defaults to today in Chicago, not UTC', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 02:00', 'UTC'));
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('entries.create'))
+        ->assertInertia(fn (Assert $page) => $page->where('today', '2026-10-17'));
 });
