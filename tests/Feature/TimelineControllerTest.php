@@ -55,3 +55,34 @@ test('the timeline reports the first day posted for the date picker', function (
     $this->get(route('home'))
         ->assertInertia(fn (Assert $page) => $page->where('firstDate', '2025-03-02'));
 });
+
+test('filtering by category shows only entries in that category', function () {
+    Entry::factory()->baseballGame()->create(['date' => '2026-10-17']);
+    Entry::factory()->birthday()->create(['date' => '2026-10-10']);
+    Entry::factory()->baseballGame()->create(['date' => '2026-09-05']);
+    Entry::factory()->create(['date' => '2026-09-01']);
+
+    $this->get(route('home', ['category' => 'baseball_game']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('category', 'baseball_game')
+            ->where('entries.data', fn ($entries) => collect($entries)->pluck('date')->all() === ['2026-10-17', '2026-09-05']));
+});
+
+test('a category filter combines with a date search', function () {
+    Entry::factory()->baseballGame()->create(['date' => '2026-10-17']);
+    Entry::factory()->baseballGame()->create(['date' => '2026-09-05']);
+    Entry::factory()->holiday()->create(['date' => '2026-09-02']);
+
+    $this->get(route('home', ['category' => 'baseball_game', 'date' => '2026-09-20']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data', fn ($entries) => collect($entries)->pluck('date')->all() === ['2026-09-05']));
+});
+
+test('an unknown category is ignored', function () {
+    Entry::factory()->count(2)->create();
+
+    $this->get(route('home', ['category' => 'wedding']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('category', null)
+            ->has('entries.data', 2));
+});

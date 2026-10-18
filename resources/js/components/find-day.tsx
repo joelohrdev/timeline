@@ -3,20 +3,22 @@ import { format, parseISO, startOfDay } from 'date-fns';
 import { CalendarSearch } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { timelineUrl } from '@/components/timeline-filters';
+import type { TimelineFilters } from '@/components/timeline-filters';
 import { Calendar } from '@/components/ui/calendar';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { home } from '@/routes';
 
 type Props = {
     firstDate: string | null;
-    selected: string | null;
+    filters: TimelineFilters;
 };
 
-export function FindDay({ firstDate, selected }: Props) {
+export function FindDay({ firstDate, filters }: Props) {
+    const selected = filters.date;
     const [open, setOpen] = useState(false);
     const today = startOfDay(new Date());
     const first = firstDate ? parseISO(firstDate) : today;
@@ -46,8 +48,9 @@ export function FindDay({ firstDate, selected }: Props) {
 
                         setOpen(false);
                         router.get(
-                            home({
-                                query: { date: format(date, 'yyyy-MM-dd') },
+                            timelineUrl({
+                                ...filters,
+                                date: format(date, 'yyyy-MM-dd'),
                             }),
                         );
                     }}

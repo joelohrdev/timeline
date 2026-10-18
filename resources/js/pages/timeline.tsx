@@ -4,12 +4,24 @@ import { BackToTop } from '@/components/back-to-top';
 import { DaySheet } from '@/components/day-sheet';
 import { FindDay } from '@/components/find-day';
 import { MonthCalendar } from '@/components/month-calendar';
+import {
+    CategoryFilter,
+    FilterSummary,
+    noMatchesMessage,
+} from '@/components/timeline-filters';
+import type { TimelineFilters } from '@/components/timeline-filters';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { monthKey, parseEntryDate } from '@/lib/dates';
+import { monthKey } from '@/lib/dates';
 import { home } from '@/routes';
 import { create } from '@/routes/entries';
-import type { Entry, Paginated, User } from '@/types';
+import type {
+    Entry,
+    EntryCategory,
+    Paginated,
+    SelectOption,
+    User,
+} from '@/types';
 
 function CalendarSkeleton() {
     return (
@@ -46,41 +58,23 @@ function groupByMonth(entries: Entry[]): [string, Entry[]][] {
 type Props = {
     entries: Paginated<Entry>;
     jumpedTo: string | null;
+    category: EntryCategory | null;
+    categories: SelectOption<EntryCategory>[];
     firstDate: string | null;
 };
 
-function SearchSummary({
+export default function Timeline({
+    entries,
     jumpedTo,
-    found,
-}: {
-    jumpedTo: string;
-    found: boolean;
-}) {
-    const date = parseEntryDate(jumpedTo);
-    const month = date.toLocaleDateString(undefined, {
-        month: 'long',
-        year: 'numeric',
-    });
-
-    return (
-        <p className="text-sm text-ink-soft">
-            {found
-                ? `Showing ${month} and earlier.`
-                : `Nothing was posted on ${date.toLocaleDateString(undefined, { dateStyle: 'long' })}. Showing ${month} and earlier.`}{' '}
-            <Link
-                href={home()}
-                className="text-ink underline underline-offset-4 hover:no-underline"
-            >
-                Back to latest
-            </Link>
-        </p>
-    );
-}
-
-export default function Timeline({ entries, jumpedTo, firstDate }: Props) {
+    category,
+    categories,
+    firstDate,
+}: Props) {
     const user = usePage().props.auth.user as User | null;
     const [openId, setOpenId] = useState<number | null>(null);
     const [handledJump, setHandledJump] = useState<string | null>(null);
+    const filters: TimelineFilters = { date: jumpedTo, category };
+    const isFiltered = jumpedTo !== null || category !== null;
     const jumpedEntry = jumpedTo
         ? (entries.data.find((entry) => entry.date === jumpedTo) ?? null)
         : null;
@@ -90,33 +84,7 @@ export default function Timeline({ entries, jumpedTo, firstDate }: Props) {
         setOpenId(jumpedEntry?.id ?? null);
     }
 
-    if (entries.data.length === 0 && jumpedTo) {
-        return (
-            <>
-                <Head title="Timeline" />
-                <div className="py-24">
-                    <h1 className="font-display text-5xl tracking-tight text-ink">
-                        Before the first post
-                    </h1>
-                    <p className="mt-3 max-w-sm text-ink-soft">
-                        Nothing was posted on or before{' '}
-                        {parseEntryDate(jumpedTo).toLocaleDateString(
-                            undefined,
-                            {
-                                dateStyle: 'long',
-                            },
-                        )}
-                        .
-                    </p>
-                    <Button asChild variant="outline" className="mt-8">
-                        <Link href={home()}>Back to latest</Link>
-                    </Button>
-                </div>
-            </>
-        );
-    }
-
-    if (entries.data.length === 0) {
+    if (entries.data.length === 0 && !isFiltered) {
         return (
             <>
                 <Head title="Timeline" />
@@ -137,23 +105,50 @@ export default function Timeline({ entries, jumpedTo, firstDate }: Props) {
         );
     }
 
+    const toolbar = (
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3 sm:mb-10">
+            <div>
+                {isFiltered && (
+                    <FilterSummary
+                        filters={filters}
+                        foundDay={jumpedEntry !== null}
+                    />
+                )}
+            </div>
+            <div className="flex items-center gap-2">
+                <CategoryFilter filters={filters} categories={categories} />
+                <FindDay firstDate={firstDate} filters={filters} />
+            </div>
+        </div>
+    );
+
+    if (entries.data.length === 0) {
+        return (
+            <>
+                <Head title="Timeline" />
+                {toolbar}
+                <div className="py-16">
+                    <h1 className="font-display text-5xl tracking-tight text-ink">
+                        No matches
+                    </h1>
+                    <p className="mt-3 max-w-sm text-ink-soft">
+                        {noMatchesMessage(filters)}
+                    </p>
+                    <Button asChild variant="outline" className="mt-8">
+                        <Link href={home()}>Clear filters</Link>
+                    </Button>
+                </div>
+            </>
+        );
+    }
+
     const openIndex = entries.data.findIndex((entry) => entry.id === openId);
     const openEntry = openIndex === -1 ? null : entries.data[openIndex];
 
     return (
         <>
             <Head title="Timeline" />
-            <div className="mb-8 flex flex-wrap items-center justify-between gap-3 sm:mb-10">
-                <div>
-                    {jumpedTo && (
-                        <SearchSummary
-                            jumpedTo={jumpedTo}
-                            found={jumpedEntry !== null}
-                        />
-                    )}
-                </div>
-                <FindDay firstDate={firstDate} selected={jumpedTo} />
-            </div>
+            {toolbar}
 
             <InfiniteScroll
                 data="entries"
