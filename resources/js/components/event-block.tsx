@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Pencil } from 'lucide-react';
+import { MapPin, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { EntryCategoryLine, entryTheme } from '@/components/entry-category';
 import { Lightbox } from '@/components/lightbox';
@@ -68,13 +68,20 @@ export function EventBlock({
     // In the timeline view, more than four extra photos go in a carousel instead of adding rows.
     const scrollsExtras = !inset && rest.length > 4;
     const theme = entryTheme(event);
+    const location = [
+        event.location_place,
+        event.location_city,
+        event.location_state,
+    ]
+        .filter(Boolean)
+        .join(', ');
     const date = parseEntryDate(event.date);
 
     return (
         <article
             className={cn(!isFirst && 'mt-10 border-t border-ink/10 pt-8')}
         >
-            {(event.title || theme || canEdit) && (
+            {(event.title || theme || location || canEdit) && (
                 <div
                     className={cn(
                         'flex items-start justify-between gap-4 pb-4',
@@ -93,6 +100,17 @@ export function EventBlock({
                                 theme={theme}
                                 className={cn(event.title && 'mt-1')}
                             />
+                        )}
+                        {location && (
+                            <p
+                                className={cn(
+                                    'flex items-center gap-1.5 text-sm text-ink-soft',
+                                    (event.title || theme) && 'mt-1',
+                                )}
+                            >
+                                <MapPin className="size-4 shrink-0" />
+                                {location}
+                            </p>
                         )}
                     </div>
                     {canEdit && (

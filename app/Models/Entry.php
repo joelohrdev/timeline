@@ -20,13 +20,16 @@ use Illuminate\Support\Str;
  * @property int $user_id
  * @property Carbon $date
  * @property string|null $title
+ * @property string|null $location_place
+ * @property string|null $location_city
+ * @property string|null $location_state
  * @property EntryCategory|null $category
  * @property array<string, int|string|null>|null $details
  * @property string|null $body
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['date', 'title', 'category', 'details', 'body'])]
+#[Fillable(['date', 'title', 'location_place', 'location_city', 'location_state', 'category', 'details', 'body'])]
 class Entry extends Model
 {
     /** @use HasFactory<EntryFactory> */

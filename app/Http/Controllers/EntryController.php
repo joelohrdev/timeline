@@ -42,7 +42,7 @@ class EntryController extends Controller
     {
         DB::transaction(function () use ($request, $storeEntryImage): void {
             $entry = $request->user()->entries()->create([
-                ...$request->safe()->only(['date', 'title', 'body']),
+                ...$request->safe()->only(['date', 'title', 'location_place', 'location_city', 'location_state', 'body']),
                 ...$request->categoryAttributes(),
             ]);
 
@@ -81,7 +81,7 @@ class EntryController extends Controller
     {
         DB::transaction(function () use ($request, $entry, $storeEntryImage): void {
             $entry->update([
-                ...$request->safe()->only(['date', 'title', 'body']),
+                ...$request->safe()->only(['date', 'title', 'location_place', 'location_city', 'location_state', 'body']),
                 ...$request->categoryAttributes(),
             ]);
 

@@ -19,7 +19,7 @@ class TimelineController extends Controller
      * Optional filters, all combinable; unknown or invalid values are ignored:
      * - ?date=YYYY-MM-DD starts at that day's month (and points at the day); ?date=YYYY-MM starts at that month.
      * - ?category=… shows only entries in that category.
-     * - ?q=… shows entries whose title, text, opponent or birthday name contains the words.
+     * - ?q=… shows entries whose title, location, text, opponent or birthday name contains the words.
      */
     public function __invoke(Request $request): Response
     {
@@ -76,7 +76,7 @@ class TimelineController extends Controller
     }
 
     /**
-     * Entries whose title, text or category details (opponent, birthday name) contain the term, ignoring case.
+     * Entries whose title, location, text or category details (opponent, birthday name) contain the term, ignoring case.
      *
      * @param  Builder<Entry>  $query
      * @return Builder<Entry>
@@ -87,6 +87,9 @@ class TimelineController extends Controller
 
         return $query->where(fn (Builder $query) => $query
             ->whereRaw("LOWER(title) LIKE ? ESCAPE '!'", [$like($term)])
+            ->orWhereRaw("LOWER(location_place) LIKE ? ESCAPE '!'", [$like($term)])
+            ->orWhereRaw("LOWER(location_city) LIKE ? ESCAPE '!'", [$like($term)])
+            ->orWhereRaw("LOWER(location_state) LIKE ? ESCAPE '!'", [$like($term)])
             ->orWhereRaw("LOWER(body) LIKE ? ESCAPE '!'", [$like($term)])
             ->orWhereRaw("LOWER(body) LIKE ? ESCAPE '!'", [$like(e($term))])
             ->orWhereRaw("LOWER(CAST(details AS CHAR)) LIKE ? ESCAPE '!'", [$like($term)]));

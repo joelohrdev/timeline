@@ -20,12 +20,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseEntryDate } from '@/lib/dates';
-import { photoTakenAt } from '@/lib/photo-date';
+import { photoLocation, photoTakenAt } from '@/lib/photo-date';
+import type { PhotoLocation } from '@/lib/photo-date';
 import { photoFingerprint } from '@/lib/photo-fingerprint';
+import { postJson } from '@/lib/post-json';
 import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
 import { cn } from '@/lib/utils';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import { check as checkPhotos } from '@/routes/photos';
+import { lookup as lookUpPlace } from '@/routes/places';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
 
@@ -49,15 +52,6 @@ type ChosenPhoto = {
     takenKey: string | null;
     duplicateOf: DuplicateOf | null;
 };
-
-/**
- * Laravel's CSRF token from its XSRF-TOKEN cookie, for plain fetch requests.
- */
-function xsrfToken(): string {
-    const match = /(?:^|; )XSRF-TOKEN=([^;]*)/.exec(document.cookie);
-
-    return match ? decodeURIComponent(match[1]) : '';
-}
 
 function shortDay(date: string, reference: string): string {
     const day = parseEntryDate(date);
@@ -94,6 +88,12 @@ export function EntryForm({
     const [cover, setCover] = useState<string | null>(null);
     const [date, setDate] = useState(entry?.date ?? defaultDate);
     const [dateFromPhoto, setDateFromPhoto] = useState<string | null>(null);
+    const [location, setLocation] = useState({
+        place: entry?.location_place ?? '',
+        city: entry?.location_city ?? '',
+        state: entry?.location_state ?? '',
+    });
+    const [locationFromPhoto, setLocationFromPhoto] = useState(false);
     const latestSelection = useRef(0);
     const [preparingRaw, setPreparingRaw] = useState(false);
     const [rawError, setRawError] = useState<string | null>(null);
@@ -201,6 +201,7 @@ export function EntryForm({
         }
 
         void markAlreadyUploaded(prepared);
+        void fillLocationFrom(added);
     };
 
     /**
@@ -211,55 +212,79 @@ export function EntryForm({
             return;
         }
 
-        try {
-            const response = await fetch(checkPhotos.url(), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-XSRF-TOKEN': xsrfToken(),
-                },
-                body: JSON.stringify({
-                    photos: photos.map((photo) => ({
-                        fingerprint: photo.fingerprint,
-                        taken_key: photo.takenKey,
-                    })),
+        const result = await postJson<{
+            matches: (DuplicateOf & { index: number })[];
+        }>(checkPhotos.url(), {
+            photos: photos.map((photo) => ({
+                fingerprint: photo.fingerprint,
+                taken_key: photo.takenKey,
+            })),
+        });
+        const byUrl = new Map(
+            (result?.matches ?? []).map((match) => [
+                photos[match.index]?.url,
+                match,
+            ]),
+        );
+
+        if (byUrl.size > 0) {
+            updateChosen(
+                chosenRef.current.map((photo) => {
+                    const match = byUrl.get(photo.url);
+
+                    return match
+                        ? {
+                              ...photo,
+                              duplicateOf: {
+                                  entry_id: match.entry_id,
+                                  date: match.date,
+                                  label: match.label,
+                              },
+                          }
+                        : photo;
                 }),
-            });
-
-            if (!response.ok) {
-                return;
-            }
-
-            const { matches } = (await response.json()) as {
-                matches: (DuplicateOf & { index: number })[];
-            };
-            const byUrl = new Map(
-                matches.map((match) => [photos[match.index]?.url, match]),
             );
-
-            if (byUrl.size > 0) {
-                updateChosen(
-                    chosenRef.current.map((photo) => {
-                        const match = byUrl.get(photo.url);
-
-                        return match
-                            ? {
-                                  ...photo,
-                                  duplicateOf: {
-                                      entry_id: match.entry_id,
-                                      date: match.date,
-                                      label: match.label,
-                                  },
-                              }
-                            : photo;
-                    }),
-                );
-            }
-        } catch {
-            // The check is a convenience; if it fails, posting still works.
         }
+    };
+
+    /**
+     * Fill any empty location fields from the first chosen photo that has GPS coordinates.
+     */
+    const fillLocationFrom = async (files: File[]) => {
+        if (location.place && location.city && location.state) {
+            return;
+        }
+
+        let coordinates: PhotoLocation | null = null;
+
+        for (const file of files) {
+            coordinates = await photoLocation(file);
+
+            if (coordinates) {
+                break;
+            }
+        }
+
+        if (!coordinates) {
+            return;
+        }
+
+        const found = await postJson<{
+            place: string | null;
+            city: string | null;
+            state: string | null;
+        }>(lookUpPlace.url(), coordinates);
+
+        if (!found || (!found.place && !found.city && !found.state)) {
+            return;
+        }
+
+        setLocation((current) => ({
+            place: current.place || found.place || '',
+            city: current.city || found.city || '',
+            state: current.state || found.state || '',
+        }));
+        setLocationFromPhoto(true);
     };
 
     const removeAlreadyUploaded = () => {
@@ -390,6 +415,71 @@ export function EntryForm({
                         />
                         <InputError message={errors.title} />
                     </div>
+
+                    <fieldset className="grid gap-2">
+                        <legend className="mb-2 text-sm leading-none font-medium">
+                            Location{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </legend>
+                        <Input
+                            name="location_place"
+                            aria-label="Place"
+                            placeholder="Place, like Wrigley Field"
+                            maxLength={120}
+                            value={location.place}
+                            onChange={(event) =>
+                                setLocation({
+                                    ...location,
+                                    place: event.target.value,
+                                })
+                            }
+                            aria-invalid={Boolean(errors.location_place)}
+                        />
+                        <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                            <Input
+                                name="location_city"
+                                aria-label="City"
+                                placeholder="City"
+                                maxLength={120}
+                                value={location.city}
+                                onChange={(event) =>
+                                    setLocation({
+                                        ...location,
+                                        city: event.target.value,
+                                    })
+                                }
+                                aria-invalid={Boolean(errors.location_city)}
+                            />
+                            <Input
+                                name="location_state"
+                                aria-label="State"
+                                placeholder="State"
+                                maxLength={60}
+                                value={location.state}
+                                onChange={(event) =>
+                                    setLocation({
+                                        ...location,
+                                        state: event.target.value,
+                                    })
+                                }
+                                aria-invalid={Boolean(errors.location_state)}
+                            />
+                        </div>
+                        {locationFromPhoto && (
+                            <p className="text-sm text-muted-foreground">
+                                Filled in from your photo's location.
+                            </p>
+                        )}
+                        <InputError
+                            message={
+                                errors.location_place ??
+                                errors.location_city ??
+                                errors.location_state
+                            }
+                        />
+                    </fieldset>
 
                     <CategoryFields
                         categories={categories}

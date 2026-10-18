@@ -43,6 +43,9 @@ export type Entry = {
     user_id: number;
     date: string;
     title: string | null;
+    location_place: string | null;
+    location_city: string | null;
+    location_state: string | null;
     category: EntryCategory | null;
     details: EntryDetails | null;
     body: string | null;

@@ -152,3 +152,11 @@ test('on this day lists the same date from earlier years, newest first', functio
             ->where('onThisDay.1.id', $twoYearsAgo->id)
             ->where('onThisDay.1.label', 'Halloween'));
 });
+
+test('search also finds entries by their location', function () {
+    $atTheGame = Entry::factory()->create(['title' => 'Ball game', 'location_place' => 'Wrigley Field', 'location_city' => 'Chicago', 'location_state' => 'IL']);
+    Entry::factory()->create(['title' => 'Beach', 'location_city' => 'Milwaukee', 'location_state' => 'WI', 'body' => null]);
+
+    $this->get(route('home', ['q' => 'chicago']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.data', fn ($entries) => collect($entries)->pluck('id')->all() === [$atTheGame->id]));
+});

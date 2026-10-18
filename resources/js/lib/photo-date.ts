@@ -2,6 +2,7 @@ const ExifIfdPointer = 0x8769;
 const DateTimeOriginal = 0x9003;
 const DateTime = 0x0132;
 const SubSecTimeOriginal = 0x9291;
+const GpsIfdPointer = 0x8825;
 
 export type PhotoTaken = {
     /** The day, "YYYY-MM-DD". */
@@ -23,20 +24,48 @@ export async function photoTakenDate(file: File): Promise<string | null> {
  * Supports JPEG, iPhone HEIC/HEIF and DNG (Apple ProRAW). Returns null for other formats, photos without EXIF, or unreadable data.
  */
 export async function photoTakenAt(file: File): Promise<PhotoTaken | null> {
+    const tiff = await photoTiff(file);
+
+    return tiff ? readTiffDate(tiff.view, tiff.start) : null;
+}
+
+export type PhotoLocation = { latitude: number; longitude: number };
+
+/**
+ * Read where a photo was taken from its EXIF GPS data, if the phone included it.
+ */
+export async function photoLocation(file: File): Promise<PhotoLocation | null> {
+    const tiff = await photoTiff(file);
+
+    return tiff ? readTiffGps(tiff.view, tiff.start) : null;
+}
+
+/**
+ * Find the photo's EXIF (TIFF) block: in a JPEG's APP1 segment, a HEIF "Exif" item, or the start of a DNG.
+ */
+async function photoTiff(
+    file: File,
+): Promise<{ view: DataView; start: number } | null> {
     try {
         if (/^image\/jpe?g$/.test(file.type)) {
-            const head = await file.slice(0, 256 * 1024).arrayBuffer();
+            const view = new DataView(
+                await file.slice(0, 256 * 1024).arrayBuffer(),
+            );
+            const start = jpegTiffStart(view);
 
-            return takenDateFromJpeg(new DataView(head));
+            return start === null ? null : { view, start };
         }
 
         if (
             /^image\/(x-adobe-)?dng$/.test(file.type) ||
             /\.dng$/i.test(file.name)
         ) {
-            const head = await file.slice(0, 2 * 1024 * 1024).arrayBuffer();
-
-            return readTiffDate(new DataView(head), 0);
+            return {
+                view: new DataView(
+                    await file.slice(0, 2 * 1024 * 1024).arrayBuffer(),
+                ),
+                start: 0,
+            };
         }
 
         if (
@@ -50,11 +79,15 @@ export async function photoTakenAt(file: File): Promise<PhotoTaken | null> {
                 return null;
             }
 
-            const item = await file
-                .slice(exif.offset, exif.offset + exif.length)
-                .arrayBuffer();
+            const view = new DataView(
+                await file
+                    .slice(exif.offset, exif.offset + exif.length)
+                    .arrayBuffer(),
+            );
 
-            return takenDateFromHeifExifItem(new DataView(item));
+            return view.byteLength < 8
+                ? null
+                : { view, start: 4 + view.getUint32(0) };
         }
     } catch {
         return null;
@@ -250,6 +283,12 @@ export function takenDateFromHeifExifItem(view: DataView): PhotoTaken | null {
 }
 
 export function takenDateFromJpeg(view: DataView): PhotoTaken | null {
+    const start = jpegTiffStart(view);
+
+    return start === null ? null : readTiffDate(view, start);
+}
+
+function jpegTiffStart(view: DataView): number | null {
     if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) {
         return null;
     }
@@ -266,13 +305,100 @@ export function takenDateFromJpeg(view: DataView): PhotoTaken | null {
         const length = view.getUint16(offset + 2);
 
         if (marker === 0xffe1 && readAscii(view, offset + 4, 4) === 'Exif') {
-            return readTiffDate(view, offset + 10);
+            return offset + 10;
         }
 
         offset += 2 + length;
     }
 
     return null;
+}
+
+/**
+ * GPS latitude and longitude from the GPS IFD (degrees, minutes, seconds as rationals).
+ */
+function readTiffGps(view: DataView, tiffStart: number): PhotoLocation | null {
+    const byteOrder = readAscii(view, tiffStart, 2);
+
+    if (byteOrder !== 'II' && byteOrder !== 'MM') {
+        return null;
+    }
+
+    const littleEndian = byteOrder === 'II';
+    const ifd0 = tiffStart + view.getUint32(tiffStart + 4, littleEndian);
+    const gpsOffset = findTag(view, ifd0, GpsIfdPointer, littleEndian);
+
+    if (gpsOffset === null) {
+        return null;
+    }
+
+    const gps = tiffStart + gpsOffset;
+    const latitude = readCoordinate(
+        view,
+        tiffStart,
+        gps,
+        0x0001,
+        0x0002,
+        littleEndian,
+    );
+    const longitude = readCoordinate(
+        view,
+        tiffStart,
+        gps,
+        0x0003,
+        0x0004,
+        littleEndian,
+    );
+
+    if (latitude === null || longitude === null) {
+        return null;
+    }
+
+    if (latitude === 0 && longitude === 0) {
+        return null;
+    }
+
+    return { latitude, longitude };
+}
+
+function readCoordinate(
+    view: DataView,
+    tiffStart: number,
+    gpsIfd: number,
+    refTag: number,
+    valueTag: number,
+    littleEndian: boolean,
+): number | null {
+    const ref = readAsciiTag(
+        view,
+        tiffStart,
+        gpsIfd,
+        refTag,
+        littleEndian,
+        true,
+    );
+    const valueOffset = findTag(view, gpsIfd, valueTag, littleEndian);
+
+    if (!ref || valueOffset === null) {
+        return null;
+    }
+
+    const start = tiffStart + valueOffset;
+
+    if (start + 24 > view.byteLength) {
+        return null;
+    }
+
+    const part = (index: number) => {
+        const denominator = view.getUint32(start + index * 8 + 4, littleEndian);
+
+        return denominator === 0
+            ? 0
+            : view.getUint32(start + index * 8, littleEndian) / denominator;
+    };
+    const degrees = part(0) + part(1) / 60 + part(2) / 3600;
+
+    return ref === 'S' || ref === 'W' ? -degrees : degrees;
 }
 
 function readTiffDate(view: DataView, tiffStart: number): PhotoTaken | null {
@@ -376,6 +502,7 @@ function readAsciiTag(
     ifd: number,
     tag: number,
     littleEndian: boolean,
+    letters = false,
 ): string | null {
     if (ifd + 2 > view.byteLength) {
         return null;
@@ -403,7 +530,7 @@ function readAsciiTag(
             .replace(/\0/g, '')
             .trim();
 
-        return /^\d+$/.test(text) ? text : null;
+        return (letters ? /^[A-Z]$/ : /^\d+$/).test(text) ? text : null;
     }
 
     return null;

@@ -36,6 +36,9 @@ class UpdateEntryRequest extends FormRequest
         return [
             'date' => ['required', 'date_format:Y-m-d'],
             'title' => ['nullable', 'string', 'max:120'],
+            'location_place' => ['nullable', 'string', 'max:120'],
+            'location_city' => ['nullable', 'string', 'max:120'],
+            'location_state' => ['nullable', 'string', 'max:60'],
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:'.max(0, 10 - $entry->images()->count())],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],

@@ -425,3 +425,17 @@ test('posted photos keep their fingerprint and taken time, in order', function (
     expect($images->pluck('original_fingerprint')->all())->toBe(['fp-a', 'fp-b'])
         ->and($images->pluck('taken_key')->all())->toBe(['2026:10:17 09:00:00.100', null]);
 });
+
+test('an entry keeps its place, city and state', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'location_place' => 'Wrigley Field',
+            'location_city' => 'Chicago',
+            'location_state' => 'IL',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->only(['location_place', 'location_city', 'location_state']))
+        ->toBe(['location_place' => 'Wrigley Field', 'location_city' => 'Chicago', 'location_state' => 'IL']);
+});
