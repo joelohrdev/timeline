@@ -1,6 +1,6 @@
 {
-    "name": "Timeline",
-    "short_name": "Timeline",
+    "name": "LohrLine",
+    "short_name": "LohrLine",
     "description": "Post today's photos and a few words.",
     "id": "/",
     "start_url": "/entries/create",
