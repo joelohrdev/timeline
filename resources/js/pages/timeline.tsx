@@ -4,10 +4,14 @@ import { BackToTop } from '@/components/back-to-top';
 import { DaySheet } from '@/components/day-sheet';
 import { FindDay } from '@/components/find-day';
 import { MonthCalendar } from '@/components/month-calendar';
+import { OnThisDay } from '@/components/on-this-day';
+import type { OnThisDayEvent } from '@/components/on-this-day';
 import {
     CategoryFilter,
     FilterSummary,
+    isDayFilter,
     noMatchesMessage,
+    SearchBox,
 } from '@/components/timeline-filters';
 import type { TimelineFilters } from '@/components/timeline-filters';
 import { Button } from '@/components/ui/button';
@@ -59,29 +63,35 @@ type Props = {
     entries: Paginated<Entry>;
     jumpedTo: string | null;
     category: EntryCategory | null;
+    search: string | null;
     categories: SelectOption<EntryCategory>[];
     firstDate: string | null;
+    onThisDay: OnThisDayEvent[];
 };
 
 export default function Timeline({
     entries,
     jumpedTo,
     category,
+    search,
     categories,
     firstDate,
+    onThisDay,
 }: Props) {
     const user = usePage().props.auth.user as User | null;
     const [openDate, setOpenDate] = useState<string | null>(null);
     const [handledJump, setHandledJump] = useState<string | null>(null);
-    const filters: TimelineFilters = { date: jumpedTo, category };
-    const isFiltered = jumpedTo !== null || category !== null;
-    const jumpedEntry = jumpedTo
-        ? (entries.data.find((entry) => entry.date === jumpedTo) ?? null)
+    const filters: TimelineFilters = { date: jumpedTo, category, search };
+    const isFiltered =
+        jumpedTo !== null || category !== null || search !== null;
+    const jumpedDay = isDayFilter(jumpedTo) ? jumpedTo : null;
+    const jumpedEntry = jumpedDay
+        ? (entries.data.find((entry) => entry.date === jumpedDay) ?? null)
         : null;
 
     if (jumpedTo !== handledJump) {
         setHandledJump(jumpedTo);
-        setOpenDate(jumpedEntry ? jumpedTo : null);
+        setOpenDate(jumpedEntry ? jumpedDay : null);
     }
 
     if (entries.data.length === 0 && !isFiltered) {
@@ -93,7 +103,8 @@ export default function Timeline({
                         Nothing here yet
                     </h1>
                     <p className="mt-3 max-w-sm text-ink-soft">
-                        Each day gets one entry: a few photos and a few words.
+                        Post a few photos and a few words for anything worth
+                        remembering.
                     </p>
                     {user && (
                         <Button asChild className="mt-8">
@@ -115,7 +126,8 @@ export default function Timeline({
                     />
                 )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+                <SearchBox filters={filters} />
                 <CategoryFilter filters={filters} categories={categories} />
                 <FindDay firstDate={firstDate} filters={filters} />
             </div>
@@ -148,6 +160,7 @@ export default function Timeline({
     return (
         <>
             <Head title="Timeline" />
+            {!isFiltered && <OnThisDay events={onThisDay} />}
             {toolbar}
 
             <InfiniteScroll
@@ -161,7 +174,7 @@ export default function Timeline({
                         key={month}
                         month={month}
                         entries={monthEntries}
-                        highlightDate={jumpedTo}
+                        highlightDate={jumpedDay}
                         onOpen={setOpenDate}
                     />
                 ))}

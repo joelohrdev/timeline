@@ -3,7 +3,7 @@ import { format, parseISO, startOfDay } from 'date-fns';
 import { CalendarSearch } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { timelineUrl } from '@/components/timeline-filters';
+import { isDayFilter, timelineUrl } from '@/components/timeline-filters';
 import type { TimelineFilters } from '@/components/timeline-filters';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export function FindDay({ firstDate, filters }: Props) {
-    const selected = filters.date;
+    const selected = isDayFilter(filters.date) ? filters.date : null;
     const [open, setOpen] = useState(false);
     const today = startOfDay(new Date());
     const first = firstDate ? parseISO(firstDate) : today;
