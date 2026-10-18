@@ -3,9 +3,11 @@
 use App\Http\Controllers\EntryController;
 use App\Http\Controllers\EntryImageController;
 use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\YearController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', TimelineController::class)->name('home');
+Route::get('years/{year}', YearController::class)->whereNumber('year')->name('years.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('dashboard', '/')->name('dashboard');

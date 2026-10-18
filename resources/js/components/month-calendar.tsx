@@ -1,6 +1,8 @@
+import { Link } from '@inertiajs/react';
 import { entryTheme } from '@/components/entry-category';
 import { parseEntryDate, plainText, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import { show as showYear } from '@/routes/years';
 import type { Entry } from '@/types';
 
 const weekdays = [
@@ -155,9 +157,12 @@ export function MonthCalendar({
             <header className="mb-5 flex items-end justify-between gap-4 sm:mb-8">
                 <h2 className="font-display text-5xl leading-none font-normal tracking-tight text-ink sm:text-7xl">
                     {first.toLocaleDateString(undefined, { month: 'long' })}
-                    <span className="ml-3 align-top font-sans text-base font-normal tracking-normal text-ink-soft sm:text-xl">
+                    <Link
+                        href={showYear(first.getFullYear())}
+                        className="ml-3 align-top font-sans text-base font-normal tracking-normal text-ink-soft underline-offset-4 hover:text-ink hover:underline sm:text-xl"
+                    >
                         {first.getFullYear()}
-                    </span>
+                    </Link>
                 </h2>
                 <p className="pb-1 text-sm text-ink-soft">
                     {entriesByDay.size === 1
