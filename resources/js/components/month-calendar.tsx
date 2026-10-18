@@ -1,7 +1,9 @@
 import { Link } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 import { entryTheme } from '@/components/entry-category';
 import { parseEntryDate, plainText, todayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import { create } from '@/routes/entries';
 import { show as showYear } from '@/routes/years';
 import type { Entry } from '@/types';
 
@@ -20,6 +22,8 @@ type Props = {
     entries: Entry[];
     highlightDate?: string | null;
     onOpen: (date: string) => void;
+    /** Logged in: empty past days link to a new entry on that date. */
+    canAdd?: boolean;
 };
 
 const highlightRing = 'ring-2 ring-ink ring-offset-2 ring-offset-paper';
@@ -128,6 +132,7 @@ export function MonthCalendar({
     entries,
     highlightDate,
     onOpen,
+    canAdd = false,
 }: Props) {
     const first = parseEntryDate(`${month}-01`);
     const daysInMonth = new Date(
@@ -203,17 +208,35 @@ export function MonthCalendar({
                         );
                     }
 
+                    const emptyClass = cn(
+                        'aspect-square rounded-sm p-1 text-[11px] leading-none text-ink-soft tabular-nums sm:rounded-md sm:p-2 sm:text-sm',
+                        key > today ? 'opacity-40' : 'bg-cell',
+                        key === today && 'ring-1 ring-ink/40 ring-inset',
+                        key === highlightDate && highlightRing,
+                    );
+
+                    if (canAdd && key <= today) {
+                        return (
+                            <Link
+                                key={key}
+                                href={create({ query: { date: key } })}
+                                aria-label={`Add an entry for ${parseEntryDate(key).toLocaleDateString(undefined, { dateStyle: 'long' })}`}
+                                className={cn(
+                                    emptyClass,
+                                    'group relative flex flex-col justify-between hover:bg-ink/10 focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-none',
+                                )}
+                            >
+                                {day}
+                                <Plus
+                                    aria-hidden="true"
+                                    className="size-4 self-center opacity-0 transition group-hover:opacity-60 group-focus-visible:opacity-60 sm:mb-3 sm:size-5"
+                                />
+                            </Link>
+                        );
+                    }
+
                     return (
-                        <div
-                            key={key}
-                            className={cn(
-                                'aspect-square rounded-sm p-1 text-[11px] leading-none text-ink-soft tabular-nums sm:rounded-md sm:p-2 sm:text-sm',
-                                key > today ? 'opacity-40' : 'bg-cell',
-                                key === today &&
-                                    'ring-1 ring-ink/40 ring-inset',
-                                key === highlightDate && highlightRing,
-                            )}
-                        >
+                        <div key={key} className={emptyClass}>
                             {day}
                         </div>
                     );

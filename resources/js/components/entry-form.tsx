@@ -20,10 +20,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseEntryDate } from '@/lib/dates';
-import { photoTakenDate } from '@/lib/photo-date';
+import { photoTakenAt } from '@/lib/photo-date';
+import { photoFingerprint } from '@/lib/photo-fingerprint';
 import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
 import { cn } from '@/lib/utils';
 import { destroy as destroyImage } from '@/routes/entries/images';
+import { check as checkPhotos } from '@/routes/photos';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
 
@@ -32,10 +34,42 @@ export type PostedEvent = {
     label: string;
 };
 
+type DuplicateOf = {
+    entry_id: number;
+    date: string;
+    label: string;
+};
+
 type ChosenPhoto = {
     file: File;
     url: string;
+    fingerprint: string;
+    takenDate: string | null;
+    /** The exact moment taken, only when it includes fractions of a second (so it identifies the photo). */
+    takenKey: string | null;
+    duplicateOf: DuplicateOf | null;
 };
+
+/**
+ * Laravel's CSRF token from its XSRF-TOKEN cookie, for plain fetch requests.
+ */
+function xsrfToken(): string {
+    const match = /(?:^|; )XSRF-TOKEN=([^;]*)/.exec(document.cookie);
+
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+function shortDay(date: string, reference: string): string {
+    const day = parseEntryDate(date);
+
+    return day.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(date.slice(0, 4) !== reference.slice(0, 4)
+            ? { year: 'numeric' }
+            : {}),
+    });
+}
 
 type Props = CategoryOptions & {
     form: RouteFormDefinition<'post'>;
@@ -79,6 +113,7 @@ export function EntryForm({
               ? 'upload:0'
               : null);
     const photoCount = existingImages.length + chosen.length;
+    const duplicateCount = chosen.filter((photo) => photo.duplicateOf).length;
 
     useEffect(() => {
         return () =>
@@ -105,6 +140,7 @@ export function EntryForm({
     const addFiles = async (files: FileList | null) => {
         const added = Array.from(files ?? []);
         const isFirstPick = chosenRef.current.length === 0;
+        const selection = ++latestSelection.current;
 
         if (fileInput.current) {
             fileInput.current.value = '';
@@ -112,32 +148,34 @@ export function EntryForm({
 
         setRawError(null);
 
-        if (!entry && isFirstPick) {
-            void setDateFromFirstPhoto(added);
-        }
-
-        const raw = added.filter(isRawPhoto);
-
-        if (raw.length > 0) {
+        if (added.some(isRawPhoto)) {
             setPreparingRaw(true);
         }
 
-        const prepared: File[] = [];
+        const prepared: ChosenPhoto[] = [];
         const unreadable: string[] = [];
 
         for (const file of added) {
-            if (!isRawPhoto(file)) {
-                prepared.push(file);
+            // Fingerprint and taken time come from the original file, before any RAW conversion.
+            const [taken, fingerprint] = await Promise.all([
+                photoTakenAt(file),
+                photoFingerprint(file),
+            ]);
+            const upload = isRawPhoto(file) ? await rawPhotoToJpeg(file) : file;
+
+            if (!upload) {
+                unreadable.push(file.name);
                 continue;
             }
 
-            const jpeg = await rawPhotoToJpeg(file);
-
-            if (jpeg) {
-                prepared.push(jpeg);
-            } else {
-                unreadable.push(file.name);
-            }
+            prepared.push({
+                file: upload,
+                url: URL.createObjectURL(upload),
+                fingerprint,
+                takenDate: taken?.date ?? null,
+                takenKey: taken?.key.includes('.') ? taken.key : null,
+                duplicateOf: null,
+            });
         }
 
         setPreparingRaw(false);
@@ -148,13 +186,88 @@ export function EntryForm({
             );
         }
 
-        updateChosen([
-            ...chosenRef.current,
-            ...prepared.map((file) => ({
-                file,
-                url: URL.createObjectURL(file),
-            })),
-        ]);
+        updateChosen([...chosenRef.current, ...prepared]);
+
+        const firstDated = prepared.find((photo) => photo.takenDate)?.takenDate;
+
+        if (
+            !entry &&
+            isFirstPick &&
+            firstDated &&
+            selection === latestSelection.current
+        ) {
+            setDate(firstDated);
+            setDateFromPhoto(firstDated);
+        }
+
+        void markAlreadyUploaded(prepared);
+    };
+
+    /**
+     * Ask the server which of these photos are already on the timeline, and mark them.
+     */
+    const markAlreadyUploaded = async (photos: ChosenPhoto[]) => {
+        if (photos.length === 0) {
+            return;
+        }
+
+        try {
+            const response = await fetch(checkPhotos.url(), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken(),
+                },
+                body: JSON.stringify({
+                    photos: photos.map((photo) => ({
+                        fingerprint: photo.fingerprint,
+                        taken_key: photo.takenKey,
+                    })),
+                }),
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const { matches } = (await response.json()) as {
+                matches: (DuplicateOf & { index: number })[];
+            };
+            const byUrl = new Map(
+                matches.map((match) => [photos[match.index]?.url, match]),
+            );
+
+            if (byUrl.size > 0) {
+                updateChosen(
+                    chosenRef.current.map((photo) => {
+                        const match = byUrl.get(photo.url);
+
+                        return match
+                            ? {
+                                  ...photo,
+                                  duplicateOf: {
+                                      entry_id: match.entry_id,
+                                      date: match.date,
+                                      label: match.label,
+                                  },
+                              }
+                            : photo;
+                    }),
+                );
+            }
+        } catch {
+            // The check is a convenience; if it fails, posting still works.
+        }
+    };
+
+    const removeAlreadyUploaded = () => {
+        chosenRef.current
+            .filter((photo) => photo.duplicateOf)
+            .forEach((photo) => URL.revokeObjectURL(photo.url));
+        updateChosen(chosenRef.current.filter((photo) => !photo.duplicateOf));
+        setCover(null);
     };
 
     const removeChosen = (index: number) => {
@@ -173,35 +286,21 @@ export function EntryForm({
     };
 
     /**
-     * On a new entry, use the day the first dated photo was taken.
-     */
-    const setDateFromFirstPhoto = async (selected: File[]) => {
-        const selection = ++latestSelection.current;
-
-        for (const file of selected) {
-            const taken = await photoTakenDate(file);
-
-            if (selection !== latestSelection.current) {
-                return;
-            }
-
-            if (taken) {
-                setDate(taken);
-                setDateFromPhoto(taken);
-
-                return;
-            }
-        }
-    };
-
-    /**
      * Send the chosen photos to the post already on this day instead of creating a new one.
      */
     const addToExistingPost = (entryId: number) => {
         setAddError(null);
         router.post(
             EntryImageController.store.url(entryId),
-            { images: chosenRef.current.map((photo) => photo.file) },
+            {
+                images: chosenRef.current.map((photo) => photo.file),
+                fingerprints: chosenRef.current.map(
+                    (photo) => photo.fingerprint,
+                ),
+                taken_keys: chosenRef.current.map(
+                    (photo) => photo.takenKey ?? '',
+                ),
+            },
             {
                 forceFormData: true,
                 onStart: () => setAddingToExisting(true),
@@ -313,6 +412,27 @@ export function EntryForm({
                     <div className="grid gap-2">
                         <Label htmlFor="images">Photos</Label>
 
+                        {duplicateCount > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
+                                <span>
+                                    {duplicateCount === chosen.length
+                                        ? duplicateCount === 1
+                                            ? 'This photo is already on your timeline.'
+                                            : `All ${duplicateCount} photos are already on your timeline.`
+                                        : `${duplicateCount} of ${chosen.length} photos are already on your timeline.`}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={removeAlreadyUploaded}
+                                    className="font-medium underline underline-offset-4 hover:no-underline"
+                                >
+                                    {duplicateCount === 1
+                                        ? 'Remove it'
+                                        : `Remove those ${duplicateCount}`}
+                                </button>
+                            </div>
+                        )}
+
                         {photoCount > 0 && (
                             <div className="grid grid-cols-4 gap-2">
                                 {existingImages.map((image) => (
@@ -345,7 +465,9 @@ export function EntryForm({
                                             onSelect={() =>
                                                 setCover(`upload:${index}`)
                                             }
+                                            dimmed={photo.duplicateOf !== null}
                                         />
+                                        <PhotoChip photo={photo} day={date} />
                                         <RemovePhotoButton
                                             onRemove={() => removeChosen(index)}
                                         />
@@ -387,6 +509,20 @@ export function EntryForm({
                             }
                             className="sr-only"
                         />
+                        {chosen.map((photo) => (
+                            <span key={photo.url} hidden>
+                                <input
+                                    type="hidden"
+                                    name="fingerprints[]"
+                                    value={photo.fingerprint}
+                                />
+                                <input
+                                    type="hidden"
+                                    name="taken_keys[]"
+                                    value={photo.takenKey ?? ''}
+                                />
+                            </span>
+                        ))}
 
                         {preparingRaw && (
                             <p className="text-sm text-muted-foreground">
@@ -484,14 +620,56 @@ export function EntryForm({
     );
 }
 
+/**
+ * When the photo was taken, or that it's already on the timeline. Amber when it's from a different day than the entry.
+ */
+function PhotoChip({ photo, day }: { photo: ChosenPhoto; day: string }) {
+    const chip =
+        'pointer-events-none absolute top-1 left-1 rounded-full px-1.5 py-0.5 text-[11px] leading-none font-medium';
+
+    if (photo.duplicateOf) {
+        return (
+            <span className={cn(chip, 'bg-foreground text-background')}>
+                Already on {shortDay(photo.duplicateOf.date, day)}
+            </span>
+        );
+    }
+
+    if (!photo.takenDate) {
+        return (
+            <span className={cn(chip, 'bg-black/60 text-white')}>No date</span>
+        );
+    }
+
+    return (
+        <span
+            className={cn(
+                chip,
+                photo.takenDate === day
+                    ? 'bg-black/60 text-white'
+                    : 'bg-amber-400 text-amber-950',
+            )}
+            title={
+                photo.takenDate === day
+                    ? undefined
+                    : 'Taken on a different day than this entry'
+            }
+        >
+            {shortDay(photo.takenDate, day)}
+        </span>
+    );
+}
+
 function CoverTile({
     src,
     isCover,
     onSelect,
+    dimmed = false,
 }: {
     src: string;
     isCover: boolean;
     onSelect: () => void;
+    dimmed?: boolean;
 }) {
     return (
         <button
@@ -508,7 +686,10 @@ function CoverTile({
             <img
                 src={src}
                 alt=""
-                className="aspect-square w-full object-cover"
+                className={cn(
+                    'aspect-square w-full object-cover',
+                    dimmed && 'opacity-45 grayscale',
+                )}
             />
             {isCover && (
                 <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background">

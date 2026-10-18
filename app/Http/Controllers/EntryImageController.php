@@ -18,7 +18,12 @@ class EntryImageController extends Controller
      */
     public function store(StoreEntryImagesRequest $request, Entry $entry, StoreEntryImage $storeEntryImage): RedirectResponse
     {
-        DB::transaction(fn () => $storeEntryImage->handleMany($entry, $request->file('images', [])));
+        DB::transaction(fn () => $storeEntryImage->handleMany(
+            $entry,
+            $request->file('images', []),
+            $request->input('fingerprints', []),
+            $request->input('taken_keys', []),
+        ));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Photos added to :day.', [
             'day' => $entry->date->format('F j'),

@@ -219,6 +219,7 @@ export default function Timeline({
                                   entries={monthEntries}
                                   highlightDate={jumpedDay}
                                   onOpen={setOpenDate}
+                                  canAdd={user !== null}
                               />
                           ),
                       )

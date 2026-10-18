@@ -75,3 +75,19 @@ test('only the poster can add photos to an entry', function () {
 
     expect($entry->images()->count())->toBe(0);
 });
+
+test('photos added to an existing entry keep their fingerprints', function () {
+    Storage::fake(config('filesystems.media_disk'));
+    $entry = Entry::factory()->create();
+
+    $this->actingAs($entry->user)
+        ->post(route('entries.images.store', $entry), [
+            'images' => [UploadedFile::fake()->image('late.jpg')],
+            'fingerprints' => ['fp-late'],
+            'taken_keys' => ['2026:07:04 20:00:00.250'],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->images()->sole()->only(['original_fingerprint', 'taken_key']))
+        ->toBe(['original_fingerprint' => 'fp-late', 'taken_key' => '2026:07:04 20:00:00.250']);
+});

@@ -33,6 +33,10 @@ class StoreEntryImagesRequest extends FormRequest
         return [
             'images' => ['required', 'array', 'min:1', 'max:'.max(0, 10 - $entry->images()->count())],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],
+            'fingerprints' => ['nullable', 'array'],
+            'fingerprints.*' => ['nullable', 'string', 'max:100'],
+            'taken_keys' => ['nullable', 'array'],
+            'taken_keys.*' => ['nullable', 'string', 'max:40'],
         ];
     }
 

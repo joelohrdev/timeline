@@ -409,3 +409,19 @@ test('untitled events are labelled by their text, and repeats on a day are numbe
             ['id' => $second->id, 'label' => 'Untitled event (2)'],
         ]));
 });
+
+test('posted photos keep their fingerprint and taken time, in order', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [UploadedFile::fake()->image('a.jpg'), UploadedFile::fake()->image('b.jpg')],
+            'fingerprints' => ['fp-a', 'fp-b'],
+            'taken_keys' => ['2026:10:17 09:00:00.100', ''],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $images = Entry::sole()->images;
+
+    expect($images->pluck('original_fingerprint')->all())->toBe(['fp-a', 'fp-b'])
+        ->and($images->pluck('taken_key')->all())->toBe(['2026:10:17 09:00:00.100', null]);
+});

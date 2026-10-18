@@ -21,13 +21,15 @@ use Illuminate\Support\Facades\Storage;
  * @property int $width
  * @property int $height
  * @property int $position
+ * @property string|null $original_fingerprint
+ * @property string|null $taken_key
  * @property-read string $url
  * @property-read string $thumb_url
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['path', 'thumb_path', 'width', 'height', 'position'])]
-#[Hidden(['path', 'thumb_path', 'created_at', 'updated_at'])]
+#[Fillable(['path', 'thumb_path', 'width', 'height', 'position', 'original_fingerprint', 'taken_key'])]
+#[Hidden(['path', 'thumb_path', 'original_fingerprint', 'taken_key', 'created_at', 'updated_at'])]
 #[Appends(['url', 'thumb_url'])]
 class EntryImage extends Model
 {

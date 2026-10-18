@@ -30,7 +30,7 @@ class StoreEntryImage
      *
      * Re-encoding through GD auto-orients the image and drops EXIF metadata such as GPS location.
      */
-    public function handle(Entry $entry, UploadedFile $file, int $position): EntryImage
+    public function handle(Entry $entry, UploadedFile $file, int $position, ?string $fingerprint = null, ?string $takenKey = null): EntryImage
     {
         $image = $this->read($file);
 
@@ -51,22 +51,35 @@ class StoreEntryImage
             'width' => $width,
             'height' => $height,
             'position' => $position,
+            'original_fingerprint' => $fingerprint,
+            'taken_key' => $takenKey,
         ]);
     }
 
     /**
      * Convert several uploads and add them after the entry's existing photos, in the order given.
      *
+     * Fingerprints and taken keys (sent by the browser, in the same order as the files) let a later upload
+     * tell whether a photo is already on the timeline.
+     *
      * @param  array<int, UploadedFile>  $files
+     * @param  array<int, string|null>  $fingerprints
+     * @param  array<int, string|null>  $takenKeys
      * @return list<EntryImage>
      */
-    public function handleMany(Entry $entry, array $files): array
+    public function handleMany(Entry $entry, array $files, array $fingerprints = [], array $takenKeys = []): array
     {
         $nextPosition = (int) $entry->images()->max('position') + ($entry->images()->exists() ? 1 : 0);
         $stored = [];
 
         foreach (array_values($files) as $offset => $file) {
-            $stored[] = $this->handle($entry, $file, $nextPosition + $offset);
+            $stored[] = $this->handle(
+                $entry,
+                $file,
+                $nextPosition + $offset,
+                $fingerprints[$offset] ?? null,
+                $takenKeys[$offset] ?? null,
+            );
         }
 
         return $stored;

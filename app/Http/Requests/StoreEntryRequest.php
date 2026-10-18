@@ -24,6 +24,10 @@ class StoreEntryRequest extends FormRequest
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],
+            'fingerprints' => ['nullable', 'array'],
+            'fingerprints.*' => ['nullable', 'string', 'max:100'],
+            'taken_keys' => ['nullable', 'array'],
+            'taken_keys.*' => ['nullable', 'string', 'max:40'],
             'cover' => ['nullable', 'string', 'regex:/^(image|upload):\d+$/'],
             ...$this->categoryRules(),
         ];

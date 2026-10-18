@@ -46,7 +46,12 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $uploaded = $storeEntryImage->handleMany($entry, $request->file('images', []));
+            $uploaded = $storeEntryImage->handleMany(
+                $entry,
+                $request->file('images', []),
+                $request->input('fingerprints', []),
+                $request->input('taken_keys', []),
+            );
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });
@@ -80,7 +85,12 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $uploaded = $storeEntryImage->handleMany($entry, $request->file('images', []));
+            $uploaded = $storeEntryImage->handleMany(
+                $entry,
+                $request->file('images', []),
+                $request->input('fingerprints', []),
+                $request->input('taken_keys', []),
+            );
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });

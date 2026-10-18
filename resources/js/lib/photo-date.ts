@@ -1,13 +1,28 @@
 const ExifIfdPointer = 0x8769;
 const DateTimeOriginal = 0x9003;
 const DateTime = 0x0132;
+const SubSecTimeOriginal = 0x9291;
+
+export type PhotoTaken = {
+    /** The day, "YYYY-MM-DD". */
+    date: string;
+    /** The exact moment, "YYYY:MM:DD HH:MM:SS" plus fractions of a second when recorded; identifies the photo. */
+    key: string;
+};
 
 /**
  * Read the day a photo was taken from its EXIF data, as "YYYY-MM-DD".
+ */
+export async function photoTakenDate(file: File): Promise<string | null> {
+    return (await photoTakenAt(file))?.date ?? null;
+}
+
+/**
+ * Read when a photo was taken from its EXIF data.
  *
  * Supports JPEG, iPhone HEIC/HEIF and DNG (Apple ProRAW). Returns null for other formats, photos without EXIF, or unreadable data.
  */
-export async function photoTakenDate(file: File): Promise<string | null> {
+export async function photoTakenAt(file: File): Promise<PhotoTaken | null> {
     try {
         if (/^image\/jpe?g$/.test(file.type)) {
             const head = await file.slice(0, 256 * 1024).arrayBuffer();
@@ -226,7 +241,7 @@ function findItemLocation(
 /**
  * A HEIF Exif item starts with a 4-byte offset to the TIFF header, then the usual EXIF data.
  */
-export function takenDateFromHeifExifItem(view: DataView): string | null {
+export function takenDateFromHeifExifItem(view: DataView): PhotoTaken | null {
     if (view.byteLength < 8) {
         return null;
     }
@@ -234,7 +249,7 @@ export function takenDateFromHeifExifItem(view: DataView): string | null {
     return readTiffDate(view, 4 + view.getUint32(0));
 }
 
-export function takenDateFromJpeg(view: DataView): string | null {
+export function takenDateFromJpeg(view: DataView): PhotoTaken | null {
     if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) {
         return null;
     }
@@ -260,7 +275,7 @@ export function takenDateFromJpeg(view: DataView): string | null {
     return null;
 }
 
-function readTiffDate(view: DataView, tiffStart: number): string | null {
+function readTiffDate(view: DataView, tiffStart: number): PhotoTaken | null {
     const byteOrder = readAscii(view, tiffStart, 2);
 
     if (byteOrder !== 'II' && byteOrder !== 'MM') {
@@ -271,20 +286,32 @@ function readTiffDate(view: DataView, tiffStart: number): string | null {
     const ifd0 = tiffStart + view.getUint32(tiffStart + 4, littleEndian);
     const exifIfdOffset = findTag(view, ifd0, ExifIfdPointer, littleEndian);
 
-    const original =
-        exifIfdOffset === null
-            ? null
-            : readDateTag(
-                  view,
-                  tiffStart,
-                  tiffStart + exifIfdOffset,
-                  DateTimeOriginal,
-                  littleEndian,
-              );
+    if (exifIfdOffset !== null) {
+        const exifIfd = tiffStart + exifIfdOffset;
+        const original = readDateTag(
+            view,
+            tiffStart,
+            exifIfd,
+            DateTimeOriginal,
+            littleEndian,
+        );
 
-    return (
-        original ?? readDateTag(view, tiffStart, ifd0, DateTime, littleEndian)
-    );
+        if (original) {
+            const fraction = readAsciiTag(
+                view,
+                tiffStart,
+                exifIfd,
+                SubSecTimeOriginal,
+                littleEndian,
+            );
+
+            return fraction
+                ? { ...original, key: `${original.key}.${fraction}` }
+                : original;
+        }
+    }
+
+    return readDateTag(view, tiffStart, ifd0, DateTime, littleEndian);
 }
 
 /**
@@ -323,22 +350,63 @@ function readDateTag(
     ifd: number,
     tag: number,
     littleEndian: boolean,
-): string | null {
+): PhotoTaken | null {
     const valueOffset = findTag(view, ifd, tag, littleEndian);
 
     if (valueOffset === null) {
         return null;
     }
 
-    const match = /^(\d{4}):(\d{2}):(\d{2})/.exec(
-        readAscii(view, tiffStart + valueOffset, 19),
-    );
+    const stamp = readAscii(view, tiffStart + valueOffset, 19);
+    const match = /^(\d{4}):(\d{2}):(\d{2}) \d{2}:\d{2}:\d{2}$/.exec(stamp);
 
     if (!match || match[1] === '0000') {
         return null;
     }
 
-    return `${match[1]}-${match[2]}-${match[3]}`;
+    return { date: `${match[1]}-${match[2]}-${match[3]}`, key: stamp };
+}
+
+/**
+ * A short ASCII tag's text (such as SubSecTimeOriginal), which is stored inline when 4 bytes or fewer.
+ */
+function readAsciiTag(
+    view: DataView,
+    tiffStart: number,
+    ifd: number,
+    tag: number,
+    littleEndian: boolean,
+): string | null {
+    if (ifd + 2 > view.byteLength) {
+        return null;
+    }
+
+    const count = view.getUint16(ifd, littleEndian);
+
+    for (let index = 0; index < count; index++) {
+        const entry = ifd + 2 + index * 12;
+
+        if (entry + 12 > view.byteLength) {
+            return null;
+        }
+
+        if (view.getUint16(entry, littleEndian) !== tag) {
+            continue;
+        }
+
+        const length = view.getUint32(entry + 4, littleEndian);
+        const start =
+            length <= 4
+                ? entry + 8
+                : tiffStart + view.getUint32(entry + 8, littleEndian);
+        const text = readAscii(view, start, Math.min(length, 16))
+            .replace(/\0/g, '')
+            .trim();
+
+        return /^\d+$/.test(text) ? text : null;
+    }
+
+    return null;
 }
 
 function readAscii(view: DataView, start: number, length: number): string {
