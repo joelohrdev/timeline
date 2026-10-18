@@ -230,3 +230,20 @@ test('the new entry form defaults to today in Chicago, not UTC', function () {
         ->get(route('entries.create'))
         ->assertInertia(fn (Assert $page) => $page->where('today', '2026-10-17'));
 });
+
+test('an entry is not saved when its image cannot be written to storage', function () {
+    config([
+        'filesystems.disks.unwritable' => ['driver' => 'local', 'root' => '/dev/null/media', 'throw' => false],
+        'filesystems.media_disk' => 'unwritable',
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [UploadedFile::fake()->image('river.jpg')],
+        ])
+        ->assertServerError();
+
+    expect(Entry::count())->toBe(0)
+        ->and(EntryImage::count())->toBe(0);
+});
