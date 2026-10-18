@@ -19,6 +19,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { parseEntryDate } from '@/lib/dates';
 import { photoTakenDate } from '@/lib/photo-date';
+import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
 import { cn } from '@/lib/utils';
 import { edit } from '@/routes/entries';
 import { destroy as destroyImage } from '@/routes/entries/images';
@@ -54,6 +55,8 @@ export function EntryForm({
     const [date, setDate] = useState(entry?.date ?? defaultDate);
     const [dateFromPhoto, setDateFromPhoto] = useState<string | null>(null);
     const latestSelection = useRef(0);
+    const [preparingRaw, setPreparingRaw] = useState(false);
+    const [rawError, setRawError] = useState<string | null>(null);
     const [askAboutDay, setAskAboutDay] = useState<string | null>(null);
     const [addingToExisting, setAddingToExisting] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
@@ -90,17 +93,59 @@ export function EntryForm({
         setChosen(next);
     };
 
-    const addFiles = (files: FileList | null) => {
+    const addFiles = async (files: FileList | null) => {
         const added = Array.from(files ?? []);
+        const isFirstPick = chosenRef.current.length === 0;
+
+        if (fileInput.current) {
+            fileInput.current.value = '';
+        }
+
+        setRawError(null);
+
+        if (!entry && isFirstPick) {
+            void setDateFromFirstPhoto(added);
+        }
+
+        const raw = added.filter(isRawPhoto);
+
+        if (raw.length > 0) {
+            setPreparingRaw(true);
+        }
+
+        const prepared: File[] = [];
+        const unreadable: string[] = [];
+
+        for (const file of added) {
+            if (!isRawPhoto(file)) {
+                prepared.push(file);
+                continue;
+            }
+
+            const jpeg = await rawPhotoToJpeg(file);
+
+            if (jpeg) {
+                prepared.push(jpeg);
+            } else {
+                unreadable.push(file.name);
+            }
+        }
+
+        setPreparingRaw(false);
+
+        if (unreadable.length > 0) {
+            setRawError(
+                `Couldn't read ${unreadable.join(', ')}. Export ${unreadable.length === 1 ? 'it' : 'them'} as JPEG or HEIC and try again.`,
+            );
+        }
 
         updateChosen([
             ...chosenRef.current,
-            ...added.map((file) => ({ file, url: URL.createObjectURL(file) })),
+            ...prepared.map((file) => ({
+                file,
+                url: URL.createObjectURL(file),
+            })),
         ]);
-
-        if (!entry && chosenRef.current.length === added.length) {
-            void setDateFromFirstPhoto(added);
-        }
     };
 
     const removeChosen = (index: number) => {
@@ -314,7 +359,7 @@ export function EntryForm({
                                     : 'Choose photos'}
                             </span>
                             <span className="text-xs">
-                                JPG, PNG, WebP or HEIC, saved as WebP
+                                JPG, PNG, WebP, HEIC or ProRAW, saved as WebP
                             </span>
                         </label>
                         <input
@@ -323,11 +368,19 @@ export function EntryForm({
                             type="file"
                             name="images[]"
                             multiple
-                            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-                            onChange={(event) => addFiles(event.target.files)}
+                            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/x-adobe-dng,image/dng,.heic,.heif,.dng"
+                            onChange={(event) =>
+                                void addFiles(event.target.files)
+                            }
                             className="sr-only"
                         />
 
+                        {preparingRaw && (
+                            <p className="text-sm text-muted-foreground">
+                                Preparing RAW photos…
+                            </p>
+                        )}
+                        <InputError message={rawError ?? undefined} />
                         <InputError message={errors.images} />
                         <InputError message={errors.cover} />
                         {Object.entries(errors)

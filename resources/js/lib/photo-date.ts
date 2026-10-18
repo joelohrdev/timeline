@@ -5,7 +5,7 @@ const DateTime = 0x0132;
 /**
  * Read the day a photo was taken from its EXIF data, as "YYYY-MM-DD".
  *
- * Supports JPEG and iPhone HEIC/HEIF. Returns null for other formats, photos without EXIF, or unreadable data.
+ * Supports JPEG, iPhone HEIC/HEIF and DNG (Apple ProRAW). Returns null for other formats, photos without EXIF, or unreadable data.
  */
 export async function photoTakenDate(file: File): Promise<string | null> {
     try {
@@ -13,6 +13,15 @@ export async function photoTakenDate(file: File): Promise<string | null> {
             const head = await file.slice(0, 256 * 1024).arrayBuffer();
 
             return takenDateFromJpeg(new DataView(head));
+        }
+
+        if (
+            /^image\/(x-adobe-)?dng$/.test(file.type) ||
+            /\.dng$/i.test(file.name)
+        ) {
+            const head = await file.slice(0, 2 * 1024 * 1024).arrayBuffer();
+
+            return readTiffDate(new DataView(head), 0);
         }
 
         if (
