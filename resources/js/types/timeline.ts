@@ -42,6 +42,7 @@ export type Entry = {
     id: number;
     user_id: number;
     date: string;
+    title: string | null;
     category: EntryCategory | null;
     details: EntryDetails | null;
     body: string | null;

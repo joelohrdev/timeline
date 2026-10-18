@@ -1,4 +1,4 @@
-import { Form, Link, router } from '@inertiajs/react';
+import { Form, router } from '@inertiajs/react';
 import { ImagePlus, Star, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { CategoryFields } from '@/components/category-fields';
@@ -16,15 +16,20 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseEntryDate } from '@/lib/dates';
 import { photoTakenDate } from '@/lib/photo-date';
 import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
 import { cn } from '@/lib/utils';
-import { edit } from '@/routes/entries';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
+
+export type PostedEvent = {
+    id: number;
+    label: string;
+};
 
 type ChosenPhoto = {
     file: File;
@@ -36,7 +41,7 @@ type Props = CategoryOptions & {
     entry?: Entry;
     defaultDate: string;
     submitLabel: string;
-    postedDays?: Record<string, number>;
+    postedDays?: Record<string, PostedEvent[]>;
 };
 
 export function EntryForm({
@@ -60,7 +65,7 @@ export function EntryForm({
     const [askAboutDay, setAskAboutDay] = useState<string | null>(null);
     const [addingToExisting, setAddingToExisting] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
-    const postedEntryId = entry ? null : (postedDays[date] ?? null);
+    const eventsThatDay = entry ? [] : (postedDays[date] ?? []);
     const existingImages = entry?.images ?? [];
     const effectiveCover =
         cover ??
@@ -180,7 +185,7 @@ export function EntryForm({
                 setDate(taken);
                 setDateFromPhoto(taken);
 
-                if (postedDays[taken]) {
+                if (postedDays[taken]?.length) {
                     setAskAboutDay(taken);
                 }
 
@@ -251,32 +256,47 @@ export function EntryForm({
                                 Set from when your photo was taken.
                             </p>
                         )}
-                        {postedEntryId !== null && (
+                        {eventsThatDay.length > 0 && (
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                <span>You already posted on this day.</span>
-                                {chosen.length > 0 ? (
+                                <span>
+                                    {eventsThatDay.length === 1
+                                        ? 'You already have an event on this day.'
+                                        : `You already have ${eventsThatDay.length} events on this day.`}
+                                </span>
+                                {chosen.length > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            addToExistingPost(postedEntryId)
-                                        }
-                                        disabled={addingToExisting}
+                                        onClick={() => setAskAboutDay(date)}
                                         className="font-medium underline underline-offset-4 hover:no-underline"
                                     >
-                                        Add photos to that post
+                                        Add these photos to{' '}
+                                        {eventsThatDay.length === 1
+                                            ? 'it'
+                                            : 'one of them'}
                                     </button>
-                                ) : (
-                                    <Link
-                                        href={edit(postedEntryId)}
-                                        className="font-medium underline underline-offset-4 hover:no-underline"
-                                    >
-                                        Edit that post
-                                    </Link>
                                 )}
                             </div>
                         )}
                         <InputError message={addError ?? undefined} />
                         <InputError message={errors.date} />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="title">
+                            Title{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
+                        <Input
+                            id="title"
+                            name="title"
+                            defaultValue={entry?.title ?? ''}
+                            placeholder="Dinner at Grandma's"
+                            maxLength={120}
+                            aria-invalid={Boolean(errors.title)}
+                        />
+                        <InputError message={errors.title} />
                     </div>
 
                     <CategoryFields
@@ -410,7 +430,11 @@ export function EntryForm({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>
-                                    You already posted on{' '}
+                                    {(askAboutDay
+                                        ? postedDays[askAboutDay]?.length
+                                        : 0) === 1
+                                        ? 'You already have an event on '
+                                        : 'You already have events on '}
                                     {askAboutDay &&
                                         parseEntryDate(
                                             askAboutDay,
@@ -420,33 +444,39 @@ export function EntryForm({
                                         })}
                                 </DialogTitle>
                                 <DialogDescription>
-                                    Add these photos to that post? Its text,
-                                    category and cover stay as they are.
-                                    Anything else on this form won't be saved.
+                                    Add these photos to an event that's already
+                                    there, or make a new event for this day.
+                                    Adding keeps that event's text, category and
+                                    cover; anything else on this form won't be
+                                    saved.
                                 </DialogDescription>
                             </DialogHeader>
+                            <div className="grid gap-2">
+                                {(askAboutDay
+                                    ? (postedDays[askAboutDay] ?? [])
+                                    : []
+                                ).map((event) => (
+                                    <Button
+                                        key={event.id}
+                                        type="button"
+                                        variant="outline"
+                                        disabled={addingToExisting}
+                                        onClick={() =>
+                                            addToExistingPost(event.id)
+                                        }
+                                        className="justify-start"
+                                    >
+                                        Add to {event.label}
+                                    </Button>
+                                ))}
+                            </div>
                             <InputError message={addError ?? undefined} />
                             <DialogFooter>
                                 <Button
                                     type="button"
-                                    variant="outline"
                                     onClick={() => setAskAboutDay(null)}
                                 >
-                                    Not now
-                                </Button>
-                                <Button
-                                    type="button"
-                                    disabled={addingToExisting}
-                                    onClick={() =>
-                                        askAboutDay &&
-                                        addToExistingPost(
-                                            postedDays[askAboutDay],
-                                        )
-                                    }
-                                >
-                                    {addingToExisting
-                                        ? 'Adding…'
-                                        : 'Add to that post'}
+                                    Make a new event
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

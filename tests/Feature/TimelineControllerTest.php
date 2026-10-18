@@ -86,3 +86,13 @@ test('an unknown category is ignored', function () {
             ->where('category', null)
             ->has('entries.data', 2));
 });
+
+test('events on the same day are listed in the order they were posted', function () {
+    $first = Entry::factory()->create(['date' => '2026-10-17']);
+    $second = Entry::factory()->create(['date' => '2026-10-17']);
+    $older = Entry::factory()->create(['date' => '2026-10-16']);
+
+    $this->get(route('home'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data', fn ($entries) => collect($entries)->pluck('id')->all() === [$first->id, $second->id, $older->id]));
+});

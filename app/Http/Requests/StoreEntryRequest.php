@@ -6,7 +6,6 @@ use App\Concerns\EntryCategoryRules;
 use App\Rules\ReadableHeifPhoto;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreEntryRequest extends FormRequest
 {
@@ -20,7 +19,8 @@ class StoreEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'date' => ['required', 'date_format:Y-m-d', Rule::unique('entries', 'date')],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],
@@ -37,7 +37,6 @@ class StoreEntryRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'date.unique' => 'There is already an entry for this day.',
         ];
     }
 

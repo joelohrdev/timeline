@@ -7,7 +7,6 @@ use App\Models\Entry;
 use App\Rules\ReadableHeifPhoto;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateEntryRequest extends FormRequest
 {
@@ -35,7 +34,8 @@ class UpdateEntryRequest extends FormRequest
         $entry = $this->route('entry');
 
         return [
-            'date' => ['required', 'date_format:Y-m-d', Rule::unique('entries', 'date')->ignore($entry)],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:'.max(0, 10 - $entry->images()->count())],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],
@@ -52,7 +52,6 @@ class UpdateEntryRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'date.unique' => 'There is already an entry for this day.',
             'images.max' => 'An entry can hold up to 10 images.',
         ];
     }

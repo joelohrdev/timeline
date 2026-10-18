@@ -33,7 +33,7 @@ export function plainText(html: string | null): string {
         .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
-        .replace(/&#39;|&apos;/g, "'")
+        .replace(/&#0*39;|&apos;/g, "'")
         .replace(/&quot;/g, '"')
         .replace(/\s+/g, ' ')
         .trim();

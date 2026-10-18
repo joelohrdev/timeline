@@ -2,13 +2,17 @@ import { Head } from '@inertiajs/react';
 import EntryController from '@/actions/App/Http/Controllers/EntryController';
 import type { CategoryOptions } from '@/components/category-fields';
 import { EntryForm } from '@/components/entry-form';
+import type { PostedEvent } from '@/components/entry-form';
 
 export default function CreateEntry({
     today,
     postedDays,
     categories,
     holidays,
-}: CategoryOptions & { today: string; postedDays: Record<string, number> }) {
+}: CategoryOptions & {
+    today: string;
+    postedDays: Record<string, PostedEvent[]>;
+}) {
     return (
         <div className="max-w-xl">
             <Head title="New entry" />

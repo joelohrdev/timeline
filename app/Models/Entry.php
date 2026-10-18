@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\SanitizeEntryBody;
 use App\EntryCategory;
+use App\Holiday;
 use Database\Factories\EntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -17,13 +18,14 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property Carbon $date
+ * @property string|null $title
  * @property EntryCategory|null $category
  * @property array<string, int|string|null>|null $details
  * @property string|null $body
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['date', 'category', 'details', 'body'])]
+#[Fillable(['date', 'title', 'category', 'details', 'body'])]
 class Entry extends Model
 {
     /** @use HasFactory<EntryFactory> */
@@ -61,6 +63,23 @@ class Entry extends Model
     protected function body(): Attribute
     {
         return Attribute::set(fn (?string $value): ?string => app(SanitizeEntryBody::class)->handle($value));
+    }
+
+    /**
+     * A short name for the event: its title, else what kind of day it was, else "Untitled event".
+     */
+    public function label(): string
+    {
+        if ($this->title) {
+            return $this->title;
+        }
+
+        return match ($this->category) {
+            EntryCategory::Holiday => Holiday::tryFrom($this->details['holiday'] ?? '')?->label() ?? 'Holiday',
+            EntryCategory::Birthday => isset($this->details['name']) ? "{$this->details['name']}'s birthday" : 'Birthday',
+            EntryCategory::BaseballGame => isset($this->details['opponent']) ? "Game against the {$this->details['opponent']}" : 'Ball game',
+            null => 'Untitled event',
+        };
     }
 
     /**

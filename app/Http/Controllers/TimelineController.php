@@ -13,7 +13,7 @@ use Inertia\Response;
 class TimelineController extends Controller
 {
     /**
-     * Show the public timeline, newest day first, loaded page by page as the visitor scrolls.
+     * Show the public timeline, newest day first (events within a day in the order they were posted), loaded page by page as the visitor scrolls.
      *
      * With ?date=YYYY-MM-DD the timeline starts at that day's month and continues back from there.
      * With ?category=… it shows only entries in that category. Unknown values are ignored.
@@ -29,6 +29,7 @@ class TimelineController extends Controller
                 ->when($jumpedTo, fn ($query) => $query->whereDate('date', '<=', $jumpedTo->copy()->endOfMonth()))
                 ->when($category, fn ($query) => $query->where('category', $category))
                 ->latest('date')
+                ->oldest('id')
                 ->paginate(40)),
             'jumpedTo' => $jumpedTo?->toDateString(),
             'category' => $category?->value,

@@ -52,13 +52,22 @@ test('posting an entry converts each upload to a display and thumbnail webp', fu
     expect(getimagesizefromstring($this->disk->get($river->thumb_path))[0])->toBe(600);
 });
 
-test('a second entry for the same day is rejected', function () {
+test('several events can be posted on the same day', function () {
     $user = User::factory()->create();
     Entry::factory()->for($user)->create(['date' => '2026-10-17']);
 
     $this->actingAs($user)
-        ->post(route('entries.store'), ['date' => '2026-10-17'])
-        ->assertSessionHasErrors(['date' => 'There is already an entry for this day.']);
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'title' => 'Dinner at Grandma\'s'])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::whereDate('date', '2026-10-17')->count())->toBe(2)
+        ->and(Entry::latest('id')->first()->title)->toBe("Dinner at Grandma's");
+});
+
+test('an event title is limited to 120 characters', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'title' => str_repeat('a', 121)])
+        ->assertSessionHasErrors('title');
 });
 
 test('non-image uploads are rejected', function () {
@@ -326,14 +335,34 @@ test('HEIC photos get a clear error when the server cannot read them', function 
     expect(Entry::count())->toBe(0);
 });
 
-test('the new entry form knows which days the user has already posted', function () {
+test('the new entry form lists the events already posted on each day', function () {
     $user = User::factory()->create();
-    $entry = Entry::factory()->for($user)->create(['date' => '2026-07-04']);
+    $game = Entry::factory()->for($user)->baseballGame('Tigers')->create(['date' => '2026-07-04', 'title' => null]);
+    $dinner = Entry::factory()->for($user)->create(['date' => '2026-07-04', 'title' => 'Dinner']);
+    $untitled = Entry::factory()->for($user)->create(['date' => '2026-07-03', 'title' => null]);
     Entry::factory()->create(['date' => '2026-07-05']);
 
     $this->actingAs($user)
         ->get(route('entries.create'))
-        ->assertInertia(fn (Assert $page) => $page->where('postedDays', ['2026-07-04' => $entry->id]));
+        ->assertInertia(fn (Assert $page) => $page->where('postedDays', [
+            '2026-07-04' => [
+                ['id' => $game->id, 'label' => 'Game against the Tigers'],
+                ['id' => $dinner->id, 'label' => 'Dinner'],
+            ],
+            '2026-07-03' => [
+                ['id' => $untitled->id, 'label' => 'Untitled event'],
+            ],
+        ]));
+});
+
+test('a new event can start on a chosen day', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('entries.create', ['date' => '2026-07-04']))
+        ->assertInertia(fn (Assert $page) => $page->where('today', '2026-07-04'));
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('entries.create', ['date' => 'nope']))
+        ->assertInertia(fn (Assert $page) => $page->where('today', now()->toDateString()));
 });
 
 test('a portrait HEIC photo stays portrait', function () {

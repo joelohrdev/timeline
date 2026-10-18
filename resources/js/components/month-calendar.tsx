@@ -17,7 +17,7 @@ type Props = {
     month: string;
     entries: Entry[];
     highlightDate?: string | null;
-    onOpen: (entry: Entry) => void;
+    onOpen: (date: string) => void;
 };
 
 const highlightRing = 'ring-2 ring-ink ring-offset-2 ring-offset-paper';
@@ -48,17 +48,19 @@ function CategoryMarker({ entry }: { entry: Entry }) {
     );
 }
 
-function EntryCell({
-    entry,
+function DayCell({
+    events,
     highlighted,
     onOpen,
 }: {
-    entry: Entry;
+    events: Entry[];
     highlighted: boolean;
     onOpen: () => void;
 }) {
-    const hero = entry.images[0];
-    const day = parseEntryDate(entry.date);
+    const cover = events.find((event) => event.images.length > 0) ?? events[0];
+    const hero = cover.images[0];
+    const categorized = events.find((event) => entryTheme(event) !== null);
+    const day = parseEntryDate(cover.date);
     const label = day.toLocaleDateString(undefined, {
         weekday: 'long',
         month: 'long',
@@ -69,7 +71,11 @@ function EntryCell({
         <button
             type="button"
             onClick={onOpen}
-            aria-label={`Open ${label}`}
+            aria-label={
+                events.length === 1
+                    ? `Open ${label}`
+                    : `Open ${label}, ${events.length} events`
+            }
             className={cn(
                 'group relative flex aspect-square cursor-pointer flex-col items-start justify-start overflow-hidden rounded-sm text-left sm:rounded-md',
                 'focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper focus-visible:outline-none',
@@ -95,13 +101,22 @@ function EntryCell({
                 {day.getDate()}
             </span>
 
-            {!hero && entry.body && (
-                <span className="relative mx-2 line-clamp-3 hidden text-xs leading-snug opacity-80 sm:block">
-                    {plainText(entry.body)}
+            {events.length > 1 && (
+                <span
+                    aria-hidden="true"
+                    className="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-paper px-1 text-[10px] leading-none font-semibold text-ink tabular-nums shadow-sm sm:top-1.5 sm:right-1.5 sm:h-5 sm:min-w-5 sm:text-xs"
+                >
+                    {events.length}
                 </span>
             )}
 
-            <CategoryMarker entry={entry} />
+            {!hero && cover.body && (
+                <span className="relative mx-2 line-clamp-3 hidden text-xs leading-snug opacity-80 sm:block">
+                    {cover.title ?? plainText(cover.body)}
+                </span>
+            )}
+
+            {categorized && <CategoryMarker entry={categorized} />}
         </button>
     );
 }
@@ -120,7 +135,14 @@ export function MonthCalendar({
     ).getDate();
     const leadingBlanks = first.getDay();
     const today = todayKey();
-    const entriesByDay = new Map(entries.map((entry) => [entry.date, entry]));
+    const entriesByDay = new Map<string, Entry[]>();
+
+    for (const entry of entries) {
+        entriesByDay.set(entry.date, [
+            ...(entriesByDay.get(entry.date) ?? []),
+            entry,
+        ]);
+    }
 
     return (
         <section
@@ -138,9 +160,9 @@ export function MonthCalendar({
                     </span>
                 </h2>
                 <p className="pb-1 text-sm text-ink-soft">
-                    {entries.length === 1
+                    {entriesByDay.size === 1
                         ? '1 day posted'
-                        : `${entries.length} days posted`}
+                        : `${entriesByDay.size} days posted`}
                 </p>
             </header>
 
@@ -163,15 +185,15 @@ export function MonthCalendar({
                 {Array.from({ length: daysInMonth }, (_, index) => {
                     const day = index + 1;
                     const key = dayKey(month, day);
-                    const entry = entriesByDay.get(key);
+                    const events = entriesByDay.get(key);
 
-                    if (entry) {
+                    if (events) {
                         return (
-                            <EntryCell
+                            <DayCell
                                 key={key}
-                                entry={entry}
+                                events={events}
                                 highlighted={key === highlightDate}
-                                onOpen={() => onOpen(entry)}
+                                onOpen={() => onOpen(key)}
                             />
                         );
                     }

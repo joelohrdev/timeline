@@ -52,6 +52,17 @@ class TimelineSeeder extends Seeder
     ];
 
     /**
+     * Extra events on the same day as an earlier one, keyed by position on the timeline.
+     *
+     * @var array<int, array{title: string, body: string}>
+     */
+    private const array SecondEvents = [
+        1 => ['title' => 'Pizza after the game', 'body' => '<p>Everyone ordered pepperoni. Nobody finished.</p>'],
+        5 => ['title' => 'Cake and presents', 'body' => '<p>Seven candles, one breath.</p>'],
+        11 => ['title' => 'Lights downtown', 'body' => '<p>Walked the square after dinner.</p>'],
+    ];
+
+    /**
      * Sky / ground colour pairs used to draw placeholder landscapes.
      *
      * @var list<array{array{int, int, int}, array{int, int, int}, array{int, int, int}}>
@@ -90,13 +101,25 @@ class TimelineSeeder extends Seeder
                 ...self::Categories[$index] ?? [],
             ]);
 
-            $imageCount = fake()->randomElement([0, 1, 1, 1, 2, 3, 4]);
+            $this->addPhotos($entry, fake()->randomElement([0, 1, 1, 1, 2, 3, 4]), $storeEntryImage);
 
-            for ($position = 0; $position < $imageCount; $position++) {
-                $file = $this->landscape();
-                $storeEntryImage->handle($entry, $file, $position);
-                unlink($file->getRealPath());
+            if (isset(self::SecondEvents[$index])) {
+                $second = $user->entries()->create([
+                    'date' => $date->toDateString(),
+                    ...self::SecondEvents[$index],
+                ]);
+
+                $this->addPhotos($second, fake()->numberBetween(1, 2), $storeEntryImage);
             }
+        }
+    }
+
+    private function addPhotos(Entry $entry, int $count, StoreEntryImage $storeEntryImage): void
+    {
+        for ($position = 0; $position < $count; $position++) {
+            $file = $this->landscape();
+            $storeEntryImage->handle($entry, $file, $position);
+            unlink($file->getRealPath());
         }
     }
 

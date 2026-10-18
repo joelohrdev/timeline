@@ -24,8 +24,15 @@ class EntryController extends Controller
     public function create(Request $request): Response
     {
         return Inertia::render('entries/create', [
-            'today' => now()->toDateString(),
-            'postedDays' => $request->user()->entries()->toBase()->pluck('id', 'date'),
+            'today' => $this->requestedDay($request) ?? now()->toDateString(),
+            'postedDays' => $request->user()->entries()
+                ->orderBy('id')
+                ->get()
+                ->groupBy(fn (Entry $entry): string => $entry->date->toDateString())
+                ->map(fn ($entries) => $entries->map(fn (Entry $entry): array => [
+                    'id' => $entry->id,
+                    'label' => $entry->label(),
+                ])->values()),
             ...$this->categoryOptions(),
         ]);
     }
@@ -37,7 +44,7 @@ class EntryController extends Controller
     {
         DB::transaction(function () use ($request, $storeEntryImage): void {
             $entry = $request->user()->entries()->create([
-                ...$request->safe()->only(['date', 'body']),
+                ...$request->safe()->only(['date', 'title', 'body']),
                 ...$request->categoryAttributes(),
             ]);
 
@@ -71,7 +78,7 @@ class EntryController extends Controller
     {
         DB::transaction(function () use ($request, $entry, $storeEntryImage): void {
             $entry->update([
-                ...$request->safe()->only(['date', 'body']),
+                ...$request->safe()->only(['date', 'title', 'body']),
                 ...$request->categoryAttributes(),
             ]);
 
@@ -97,6 +104,18 @@ class EntryController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Entry deleted.')]);
 
         return to_route('home');
+    }
+
+    /**
+     * A valid ?date=YYYY-MM-DD to start a new event on, e.g. from "Add another event" on a day.
+     */
+    private function requestedDay(Request $request): ?string
+    {
+        $date = $request->query('date');
+
+        return is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) && strtotime($date) !== false
+            ? $date
+            : null;
     }
 
     /**

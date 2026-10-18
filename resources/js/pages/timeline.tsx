@@ -71,7 +71,7 @@ export default function Timeline({
     firstDate,
 }: Props) {
     const user = usePage().props.auth.user as User | null;
-    const [openId, setOpenId] = useState<number | null>(null);
+    const [openDate, setOpenDate] = useState<string | null>(null);
     const [handledJump, setHandledJump] = useState<string | null>(null);
     const filters: TimelineFilters = { date: jumpedTo, category };
     const isFiltered = jumpedTo !== null || category !== null;
@@ -81,7 +81,7 @@ export default function Timeline({
 
     if (jumpedTo !== handledJump) {
         setHandledJump(jumpedTo);
-        setOpenId(jumpedEntry?.id ?? null);
+        setOpenDate(jumpedEntry ? jumpedTo : null);
     }
 
     if (entries.data.length === 0 && !isFiltered) {
@@ -142,8 +142,8 @@ export default function Timeline({
         );
     }
 
-    const openIndex = entries.data.findIndex((entry) => entry.id === openId);
-    const openEntry = openIndex === -1 ? null : entries.data[openIndex];
+    const days = [...new Set(entries.data.map((entry) => entry.date))];
+    const openIndex = openDate ? days.indexOf(openDate) : -1;
 
     return (
         <>
@@ -162,17 +162,18 @@ export default function Timeline({
                         month={month}
                         entries={monthEntries}
                         highlightDate={jumpedTo}
-                        onOpen={(entry) => setOpenId(entry.id)}
+                        onOpen={setOpenDate}
                     />
                 ))}
             </InfiniteScroll>
 
             <DaySheet
-                entry={openEntry}
-                canEdit={openEntry !== null && user?.id === openEntry.user_id}
-                newer={openIndex > 0 ? entries.data[openIndex - 1] : null}
-                older={entries.data[openIndex + 1] ?? null}
-                onNavigate={(entry) => setOpenId(entry?.id ?? null)}
+                date={openIndex === -1 ? null : openDate}
+                events={entries.data.filter((entry) => entry.date === openDate)}
+                userId={user?.id ?? null}
+                newer={openIndex > 0 ? days[openIndex - 1] : null}
+                older={openIndex === -1 ? null : (days[openIndex + 1] ?? null)}
+                onNavigate={setOpenDate}
             />
 
             <BackToTop />
