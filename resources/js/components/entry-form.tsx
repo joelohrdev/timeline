@@ -1,4 +1,4 @@
-import { Form, router } from '@inertiajs/react';
+import { Form, Link, router } from '@inertiajs/react';
 import { ImagePlus, Star, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { CategoryFields } from '@/components/category-fields';
@@ -6,10 +6,21 @@ import type { CategoryOptions } from '@/components/category-fields';
 import { DatePicker } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import { RichTextEditor } from '@/components/rich-text-editor';
+import EntryImageController from '@/actions/App/Http/Controllers/EntryImageController';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { parseEntryDate } from '@/lib/dates';
 import { photoTakenDate } from '@/lib/photo-date';
 import { cn } from '@/lib/utils';
+import { edit } from '@/routes/entries';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
@@ -24,6 +35,7 @@ type Props = CategoryOptions & {
     entry?: Entry;
     defaultDate: string;
     submitLabel: string;
+    postedDays?: Record<string, number>;
 };
 
 export function EntryForm({
@@ -33,6 +45,7 @@ export function EntryForm({
     submitLabel,
     categories,
     holidays,
+    postedDays = {},
 }: Props) {
     const [chosen, setChosen] = useState<ChosenPhoto[]>([]);
     const chosenRef = useRef<ChosenPhoto[]>([]);
@@ -41,6 +54,10 @@ export function EntryForm({
     const [date, setDate] = useState(entry?.date ?? defaultDate);
     const [dateFromPhoto, setDateFromPhoto] = useState<string | null>(null);
     const latestSelection = useRef(0);
+    const [askAboutDay, setAskAboutDay] = useState<string | null>(null);
+    const [addingToExisting, setAddingToExisting] = useState(false);
+    const [addError, setAddError] = useState<string | null>(null);
+    const postedEntryId = entry ? null : (postedDays[date] ?? null);
     const existingImages = entry?.images ?? [];
     const effectiveCover =
         cover ??
@@ -118,9 +135,32 @@ export function EntryForm({
                 setDate(taken);
                 setDateFromPhoto(taken);
 
+                if (postedDays[taken]) {
+                    setAskAboutDay(taken);
+                }
+
                 return;
             }
         }
+    };
+
+    /**
+     * Send the chosen photos to the post already on this day instead of creating a new one.
+     */
+    const addToExistingPost = (entryId: number) => {
+        setAddError(null);
+        router.post(
+            EntryImageController.store.url(entryId),
+            { images: chosenRef.current.map((photo) => photo.file) },
+            {
+                forceFormData: true,
+                onStart: () => setAddingToExisting(true),
+                onFinish: () => setAddingToExisting(false),
+                onError: (errors) =>
+                    setAddError(Object.values(errors)[0] ?? null),
+                onSuccess: () => setAskAboutDay(null),
+            },
+        );
     };
 
     const removeImage = (imageId: number) => {
@@ -166,6 +206,31 @@ export function EntryForm({
                                 Set from when your photo was taken.
                             </p>
                         )}
+                        {postedEntryId !== null && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                <span>You already posted on this day.</span>
+                                {chosen.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            addToExistingPost(postedEntryId)
+                                        }
+                                        disabled={addingToExisting}
+                                        className="font-medium underline underline-offset-4 hover:no-underline"
+                                    >
+                                        Add photos to that post
+                                    </button>
+                                ) : (
+                                    <Link
+                                        href={edit(postedEntryId)}
+                                        className="font-medium underline underline-offset-4 hover:no-underline"
+                                    >
+                                        Edit that post
+                                    </Link>
+                                )}
+                            </div>
+                        )}
+                        <InputError message={addError ?? undefined} />
                         <InputError message={errors.date} />
                     </div>
 
@@ -284,6 +349,55 @@ export function EntryForm({
                     <Button type="submit" disabled={processing}>
                         {processing ? 'Saving…' : submitLabel}
                     </Button>
+
+                    <Dialog
+                        open={askAboutDay !== null}
+                        onOpenChange={(open) => !open && setAskAboutDay(null)}
+                    >
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    You already posted on{' '}
+                                    {askAboutDay &&
+                                        parseEntryDate(
+                                            askAboutDay,
+                                        ).toLocaleDateString(undefined, {
+                                            month: 'long',
+                                            day: 'numeric',
+                                        })}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Add these photos to that post? Its text,
+                                    category and cover stay as they are.
+                                    Anything else on this form won't be saved.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <InputError message={addError ?? undefined} />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setAskAboutDay(null)}
+                                >
+                                    Not now
+                                </Button>
+                                <Button
+                                    type="button"
+                                    disabled={addingToExisting}
+                                    onClick={() =>
+                                        askAboutDay &&
+                                        addToExistingPost(
+                                            postedDays[askAboutDay],
+                                        )
+                                    }
+                                >
+                                    {addingToExisting
+                                        ? 'Adding…'
+                                        : 'Add to that post'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </>
             )}
         </Form>

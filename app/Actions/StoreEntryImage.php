@@ -55,6 +55,24 @@ class StoreEntryImage
     }
 
     /**
+     * Convert several uploads and add them after the entry's existing photos, in the order given.
+     *
+     * @param  array<int, UploadedFile>  $files
+     * @return list<EntryImage>
+     */
+    public function handleMany(Entry $entry, array $files): array
+    {
+        $nextPosition = (int) $entry->images()->max('position') + ($entry->images()->exists() ? 1 : 0);
+        $stored = [];
+
+        foreach (array_values($files) as $offset => $file) {
+            $stored[] = $this->handle($entry, $file, $nextPosition + $offset);
+        }
+
+        return $stored;
+    }
+
+    /**
      * Whether this server's Imagick can decode HEIC/HEIF photos.
      */
     public function canReadHeif(): bool

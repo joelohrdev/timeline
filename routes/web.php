@@ -12,6 +12,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('entries', EntryController::class)->except(['index', 'show']);
 
+    Route::post('entries/{entry}/images', [EntryImageController::class, 'store'])
+        ->name('entries.images.store');
+
     Route::delete('entries/{entry}/images/{image}', [EntryImageController::class, 'destroy'])
         ->scopeBindings()
         ->name('entries.images.destroy');

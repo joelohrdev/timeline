@@ -5,9 +5,10 @@ import { EntryForm } from '@/components/entry-form';
 
 export default function CreateEntry({
     today,
+    postedDays,
     categories,
     holidays,
-}: CategoryOptions & { today: string }) {
+}: CategoryOptions & { today: string; postedDays: Record<string, number> }) {
     return (
         <div className="max-w-xl">
             <Head title="New entry" />
@@ -17,6 +18,7 @@ export default function CreateEntry({
             <EntryForm
                 form={EntryController.store.form()}
                 defaultDate={today}
+                postedDays={postedDays}
                 categories={categories}
                 holidays={holidays}
                 submitLabel="Post entry"

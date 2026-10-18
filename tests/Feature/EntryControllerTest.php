@@ -325,3 +325,13 @@ test('HEIC photos get a clear error when the server cannot read them', function 
 
     expect(Entry::count())->toBe(0);
 });
+
+test('the new entry form knows which days the user has already posted', function () {
+    $user = User::factory()->create();
+    $entry = Entry::factory()->for($user)->create(['date' => '2026-07-04']);
+    Entry::factory()->create(['date' => '2026-07-05']);
+
+    $this->actingAs($user)
+        ->get(route('entries.create'))
+        ->assertInertia(fn (Assert $page) => $page->where('postedDays', ['2026-07-04' => $entry->id]));
+});

@@ -10,7 +10,7 @@ use App\Http\Requests\UpdateEntryRequest;
 use App\Models\Entry;
 use App\Models\EntryImage;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -21,10 +21,11 @@ class EntryController extends Controller
     /**
      * Show the form for a new day's entry.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('entries/create', [
             'today' => now()->toDateString(),
+            'postedDays' => $request->user()->entries()->toBase()->pluck('id', 'date'),
             ...$this->categoryOptions(),
         ]);
     }
@@ -40,7 +41,7 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $uploaded = $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+            $uploaded = $storeEntryImage->handleMany($entry, $request->file('images', []));
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });
@@ -74,7 +75,7 @@ class EntryController extends Controller
                 ...$request->categoryAttributes(),
             ]);
 
-            $uploaded = $this->storeImages($entry, $request->file('images', []), $storeEntryImage);
+            $uploaded = $storeEntryImage->handleMany($entry, $request->file('images', []));
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);
         });
@@ -109,22 +110,6 @@ class EntryController extends Controller
             'categories' => EntryCategory::options(),
             'holidays' => Holiday::options(),
         ];
-    }
-
-    /**
-     * @param  array<int, UploadedFile>  $files
-     * @return list<EntryImage>
-     */
-    private function storeImages(Entry $entry, array $files, StoreEntryImage $storeEntryImage): array
-    {
-        $nextPosition = (int) $entry->images()->max('position') + ($entry->images()->exists() ? 1 : 0);
-        $uploaded = [];
-
-        foreach (array_values($files) as $offset => $file) {
-            $uploaded[] = $storeEntryImage->handle($entry, $file, $nextPosition + $offset);
-        }
-
-        return $uploaded;
     }
 
     /**
