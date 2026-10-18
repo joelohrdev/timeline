@@ -23,6 +23,7 @@ class EntryImageController extends Controller
             $request->file('images', []),
             $request->input('fingerprints', []),
             $request->input('taken_keys', []),
+            $request->input('taken_times', []),
         ));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Photos added to :day.', [

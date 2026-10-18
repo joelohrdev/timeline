@@ -65,9 +65,10 @@ class StoreEntryImage
      * @param  array<int, UploadedFile>  $files
      * @param  array<int, string|null>  $fingerprints
      * @param  array<int, string|null>  $takenKeys
+     * @param  array<int, string|null>  $takenTimes  When each photo was taken ("YYYY:MM:DD HH:MM:SS"), for ordering the day's events.
      * @return list<EntryImage>
      */
-    public function handleMany(Entry $entry, array $files, array $fingerprints = [], array $takenKeys = []): array
+    public function handleMany(Entry $entry, array $files, array $fingerprints = [], array $takenKeys = [], array $takenTimes = []): array
     {
         $nextPosition = (int) $entry->images()->max('position') + ($entry->images()->exists() ? 1 : 0);
         $stored = [];
@@ -81,6 +82,8 @@ class StoreEntryImage
                 $takenKeys[$offset] ?? null,
             );
         }
+
+        $entry->notePhotoTimes(array_values($takenTimes));
 
         return $stored;
     }

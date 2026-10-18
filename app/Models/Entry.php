@@ -7,6 +7,8 @@ use App\EntryCategory;
 use App\Holiday;
 use Database\Factories\EntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +21,7 @@ use Illuminate\Support\Str;
  * @property int $id
  * @property int $user_id
  * @property Carbon $date
+ * @property string|null $photo_time
  * @property string|null $title
  * @property string|null $location_place
  * @property string|null $location_city
@@ -29,7 +32,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['date', 'title', 'location_place', 'location_city', 'location_state', 'category', 'details', 'body'])]
+#[Fillable(['date', 'photo_time', 'title', 'location_place', 'location_city', 'location_state', 'category', 'details', 'body'])]
 class Entry extends Model
 {
     /** @use HasFactory<EntryFactory> */
@@ -67,6 +70,43 @@ class Entry extends Model
     protected function body(): Attribute
     {
         return Attribute::set(fn (?string $value): ?string => app(SanitizeEntryBody::class)->handle($value));
+    }
+
+    /**
+     * Order events within a day by when their photos were taken; events without a photo time follow, in the order posted.
+     *
+     * @param  Builder<Entry>  $query
+     */
+    #[Scope]
+    protected function inDayOrder(Builder $query): void
+    {
+        $query->orderByRaw('photo_time IS NULL')->orderBy('photo_time')->orderBy('id');
+    }
+
+    /**
+     * Remember the earliest time of day a photo from this entry's day was taken, so the day's events can be ordered.
+     *
+     * Stamps are EXIF-style ("YYYY:MM:DD HH:MM:SS"); photos taken on other days are ignored.
+     *
+     * @param  list<string|null>  $stamps
+     */
+    public function notePhotoTimes(array $stamps): void
+    {
+        $day = $this->date->format('Y:m:d');
+        $times = collect($stamps)
+            ->filter(fn (?string $stamp): bool => is_string($stamp) && preg_match('/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}/', $stamp) === 1)
+            ->filter(fn (string $stamp): bool => str_starts_with($stamp, $day))
+            ->map(fn (string $stamp): string => substr($stamp, 11, 8));
+
+        if ($this->photo_time !== null) {
+            $times->push($this->photo_time);
+        }
+
+        $earliest = $times->sort()->first();
+
+        if ($earliest !== null && $earliest !== $this->photo_time) {
+            $this->update(['photo_time' => $earliest]);
+        }
     }
 
     /**

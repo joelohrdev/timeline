@@ -50,6 +50,8 @@ type ChosenPhoto = {
     takenDate: string | null;
     /** The exact moment taken, only when it includes fractions of a second (so it identifies the photo). */
     takenKey: string | null;
+    /** When it was taken ("YYYY:MM:DD HH:MM:SS"), used to order a day's events. */
+    takenStamp: string | null;
     duplicateOf: DuplicateOf | null;
 };
 
@@ -174,6 +176,7 @@ export function EntryForm({
                 fingerprint,
                 takenDate: taken?.date ?? null,
                 takenKey: taken?.key.includes('.') ? taken.key : null,
+                takenStamp: taken?.key ?? null,
                 duplicateOf: null,
             });
         }
@@ -324,6 +327,9 @@ export function EntryForm({
                 ),
                 taken_keys: chosenRef.current.map(
                     (photo) => photo.takenKey ?? '',
+                ),
+                taken_times: chosenRef.current.map(
+                    (photo) => photo.takenStamp ?? '',
                 ),
             },
             {
@@ -610,6 +616,11 @@ export function EntryForm({
                                     type="hidden"
                                     name="taken_keys[]"
                                     value={photo.takenKey ?? ''}
+                                />
+                                <input
+                                    type="hidden"
+                                    name="taken_times[]"
+                                    value={photo.takenStamp ?? ''}
                                 />
                             </span>
                         ))}

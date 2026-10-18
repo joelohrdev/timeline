@@ -160,3 +160,12 @@ test('search also finds entries by their location', function () {
     $this->get(route('home', ['q' => 'chicago']))
         ->assertInertia(fn (Assert $page) => $page->where('entries.data', fn ($entries) => collect($entries)->pluck('id')->all() === [$atTheGame->id]));
 });
+
+test("a day's events are ordered by when their photos were taken, untimed ones last", function () {
+    $untimed = Entry::factory()->create(['date' => '2026-10-17', 'photo_time' => null]);
+    $evening = Entry::factory()->create(['date' => '2026-10-17', 'photo_time' => '19:30:00']);
+    $morning = Entry::factory()->create(['date' => '2026-10-17', 'photo_time' => '08:15:00']);
+
+    $this->get(route('home'))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.data', fn ($entries) => collect($entries)->pluck('id')->all() === [$morning->id, $evening->id, $untimed->id]));
+});

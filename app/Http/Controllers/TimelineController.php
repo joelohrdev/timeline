@@ -34,7 +34,7 @@ class TimelineController extends Controller
                 ->when($category, fn (Builder $query) => $query->where('category', $category))
                 ->when($search, fn (Builder $query) => $this->matching($query, (string) $search))
                 ->latest('date')
-                ->oldest('id')
+                ->inDayOrder()
                 ->paginate(40)),
             'jumpedTo' => $jumpedTo,
             'category' => $category?->value,
@@ -110,7 +110,7 @@ class TimelineController extends Controller
             ->whereDay('date', $today->day)
             ->whereYear('date', '<', $today->year)
             ->latest('date')
-            ->oldest('id')
+            ->inDayOrder()
             ->limit(12)
             ->get()
             ->map(fn (Entry $entry): array => [

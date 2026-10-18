@@ -37,6 +37,8 @@ class StoreEntryImagesRequest extends FormRequest
             'fingerprints.*' => ['nullable', 'string', 'max:100'],
             'taken_keys' => ['nullable', 'array'],
             'taken_keys.*' => ['nullable', 'string', 'max:40'],
+            'taken_times' => ['nullable', 'array'],
+            'taken_times.*' => ['nullable', 'string', 'max:40'],
         ];
     }
 

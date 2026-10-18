@@ -27,7 +27,7 @@ class EntryController extends Controller
         return Inertia::render('entries/create', [
             'today' => $this->requestedDay($request) ?? now()->toDateString(),
             'postedDays' => $request->user()->entries()
-                ->orderBy('id')
+                ->inDayOrder()
                 ->get()
                 ->groupBy(fn (Entry $entry): string => $entry->date->toDateString())
                 ->map(fn ($entries) => $this->distinctLabels($entries)),
@@ -51,6 +51,7 @@ class EntryController extends Controller
                 $request->file('images', []),
                 $request->input('fingerprints', []),
                 $request->input('taken_keys', []),
+                $request->input('taken_times', []),
             );
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);
@@ -90,6 +91,7 @@ class EntryController extends Controller
                 $request->file('images', []),
                 $request->input('fingerprints', []),
                 $request->input('taken_keys', []),
+                $request->input('taken_times', []),
             );
 
             $this->applyCover($entry, $request->validated('cover'), $uploaded);

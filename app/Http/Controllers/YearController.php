@@ -20,7 +20,7 @@ class YearController extends Controller
             ->with('images')
             ->whereYear('date', $year)
             ->oldest('date')
-            ->oldest('id')
+            ->inDayOrder()
             ->get();
 
         $games = $entries->where('category', EntryCategory::BaseballGame)->values();
