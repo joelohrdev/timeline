@@ -11,6 +11,7 @@ use App\Models\Entry;
 use App\Models\EntryImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -29,10 +30,7 @@ class EntryController extends Controller
                 ->orderBy('id')
                 ->get()
                 ->groupBy(fn (Entry $entry): string => $entry->date->toDateString())
-                ->map(fn ($entries) => $entries->map(fn (Entry $entry): array => [
-                    'id' => $entry->id,
-                    'label' => $entry->label(),
-                ])->values()),
+                ->map(fn ($entries) => $this->distinctLabels($entries)),
             ...$this->categoryOptions(),
         ]);
     }
@@ -104,6 +102,27 @@ class EntryController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Entry deleted.')]);
 
         return to_route('home');
+    }
+
+    /**
+     * Each event's label, numbering repeats ("Untitled event (2)") so events on one day can be told apart.
+     *
+     * @param  Collection<int, Entry>  $entries
+     * @return list<array{id: int, label: string}>
+     */
+    private function distinctLabels(Collection $entries): array
+    {
+        $seen = [];
+
+        return array_values($entries->map(function (Entry $entry) use (&$seen): array {
+            $label = $entry->label();
+            $seen[$label] = ($seen[$label] ?? 0) + 1;
+
+            return [
+                'id' => $entry->id,
+                'label' => $seen[$label] > 1 ? "{$label} ({$seen[$label]})" : $label,
+            ];
+        })->all());
     }
 
     /**

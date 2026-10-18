@@ -1,4 +1,5 @@
 import { Form, router } from '@inertiajs/react';
+import type { FormComponentRef } from '@inertiajs/core';
 import { ImagePlus, Star, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { CategoryFields } from '@/components/category-fields';
@@ -63,6 +64,9 @@ export function EntryForm({
     const [preparingRaw, setPreparingRaw] = useState(false);
     const [rawError, setRawError] = useState<string | null>(null);
     const [askAboutDay, setAskAboutDay] = useState<string | null>(null);
+    const formRef = useRef<FormComponentRef>(null);
+    // Set when the poster chose "Post as a new event", so the resubmit isn't paused again.
+    const postAsNewEvent = useRef(false);
     const [addingToExisting, setAddingToExisting] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
     const eventsThatDay = entry ? [] : (postedDays[date] ?? []);
@@ -185,10 +189,6 @@ export function EntryForm({
                 setDate(taken);
                 setDateFromPhoto(taken);
 
-                if (postedDays[taken]?.length) {
-                    setAskAboutDay(taken);
-                }
-
                 return;
             }
         }
@@ -230,7 +230,21 @@ export function EntryForm({
     return (
         <Form
             {...form}
+            ref={formRef}
             options={{ preserveScroll: 'errors' }}
+            onBefore={() => {
+                if (
+                    eventsThatDay.length > 0 &&
+                    chosenRef.current.length > 0 &&
+                    !postAsNewEvent.current
+                ) {
+                    setAskAboutDay(date);
+
+                    return false;
+                }
+
+                postAsNewEvent.current = false;
+            }}
             onSuccess={() => {
                 chosenRef.current.forEach((photo) =>
                     URL.revokeObjectURL(photo.url),
@@ -255,27 +269,6 @@ export function EntryForm({
                             <p className="text-sm text-muted-foreground">
                                 Set from when your photo was taken.
                             </p>
-                        )}
-                        {eventsThatDay.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                <span>
-                                    {eventsThatDay.length === 1
-                                        ? 'You already have an event on this day.'
-                                        : `You already have ${eventsThatDay.length} events on this day.`}
-                                </span>
-                                {chosen.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setAskAboutDay(date)}
-                                        className="font-medium underline underline-offset-4 hover:no-underline"
-                                    >
-                                        Add these photos to{' '}
-                                        {eventsThatDay.length === 1
-                                            ? 'it'
-                                            : 'one of them'}
-                                    </button>
-                                )}
-                            </div>
                         )}
                         <InputError message={addError ?? undefined} />
                         <InputError message={errors.date} />
@@ -445,10 +438,10 @@ export function EntryForm({
                                 </DialogTitle>
                                 <DialogDescription>
                                     Add these photos to an event that's already
-                                    there, or make a new event for this day.
-                                    Adding keeps that event's text, category and
-                                    cover; anything else on this form won't be
-                                    saved.
+                                    there, or post this as a new event on the
+                                    same day. Adding keeps that event's text,
+                                    category and cover; anything else on this
+                                    form won't be saved.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-2">
@@ -474,9 +467,13 @@ export function EntryForm({
                             <DialogFooter>
                                 <Button
                                     type="button"
-                                    onClick={() => setAskAboutDay(null)}
+                                    onClick={() => {
+                                        setAskAboutDay(null);
+                                        postAsNewEvent.current = true;
+                                        formRef.current?.submit();
+                                    }}
                                 >
-                                    Make a new event
+                                    Post as a new event
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

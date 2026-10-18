@@ -339,7 +339,7 @@ test('the new entry form lists the events already posted on each day', function 
     $user = User::factory()->create();
     $game = Entry::factory()->for($user)->baseballGame('Tigers')->create(['date' => '2026-07-04', 'title' => null]);
     $dinner = Entry::factory()->for($user)->create(['date' => '2026-07-04', 'title' => 'Dinner']);
-    $untitled = Entry::factory()->for($user)->create(['date' => '2026-07-03', 'title' => null]);
+    $untitled = Entry::factory()->for($user)->create(['date' => '2026-07-03', 'title' => null, 'body' => null]);
     Entry::factory()->create(['date' => '2026-07-05']);
 
     $this->actingAs($user)
@@ -377,3 +377,18 @@ test('a portrait HEIC photo stays portrait', function () {
 
     expect([$image->width, $image->height])->toBe([800, 1200]);
 })->skip(fn () => ! app(StoreEntryImage::class)->canReadHeif(), 'Imagick on this machine cannot read HEIC');
+
+test('untitled events are labelled by their text, and repeats on a day are numbered', function () {
+    $user = User::factory()->create();
+    $text = Entry::factory()->for($user)->create(['date' => '2026-07-04', 'title' => null, 'body' => "<p>Kids' parade down Main Street and a long picnic after.</p>"]);
+    $first = Entry::factory()->for($user)->create(['date' => '2026-07-04', 'title' => null, 'body' => null]);
+    $second = Entry::factory()->for($user)->create(['date' => '2026-07-04', 'title' => null, 'body' => null]);
+
+    $this->actingAs($user)
+        ->get(route('entries.create'))
+        ->assertInertia(fn (Assert $page) => $page->where('postedDays.2026-07-04', [
+            ['id' => $text->id, 'label' => "Kids' parade down Main Street and a long..."],
+            ['id' => $first->id, 'label' => 'Untitled event'],
+            ['id' => $second->id, 'label' => 'Untitled event (2)'],
+        ]));
+});

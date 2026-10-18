@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -66,7 +67,7 @@ class Entry extends Model
     }
 
     /**
-     * A short name for the event: its title, else what kind of day it was, else "Untitled event".
+     * A short name for the event: its title, else what kind of day it was, else the start of its text, else "Untitled event".
      */
     public function label(): string
     {
@@ -78,7 +79,9 @@ class Entry extends Model
             EntryCategory::Holiday => Holiday::tryFrom($this->details['holiday'] ?? '')?->label() ?? 'Holiday',
             EntryCategory::Birthday => isset($this->details['name']) ? "{$this->details['name']}'s birthday" : 'Birthday',
             EntryCategory::BaseballGame => isset($this->details['opponent']) ? "Game against the {$this->details['opponent']}" : 'Ball game',
-            null => 'Untitled event',
+            null => $this->body
+                ? Str::limit(trim(html_entity_decode(strip_tags($this->body), ENT_QUOTES)), 40)
+                : 'Untitled event',
         };
     }
 
