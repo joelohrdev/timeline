@@ -9,6 +9,7 @@ const MaxPreviewSide = 2400;
 const Tag = {
     NewSubfileType: 0x00fe,
     ImageWidth: 0x0100,
+    ImageLength: 0x0101,
     Compression: 0x0103,
     Photometric: 0x0106,
     StripOffsets: 0x0111,
@@ -43,13 +44,27 @@ export async function rawPhotoToJpeg(file: File): Promise<File | null> {
             return null;
         }
 
-        const jpeg = file.slice(
-            found.preview.offset,
-            found.preview.offset + found.preview.length,
-            'image/jpeg',
+        const jpeg = new Uint8Array(
+            await file
+                .slice(
+                    found.preview.offset,
+                    found.preview.offset + found.preview.length,
+                )
+                .arrayBuffer(),
         );
-        const bitmap = await createImageBitmap(jpeg);
-        const blob = await drawUpright(bitmap, found.orientation);
+
+        // Decode the pixels exactly as stored: with EXIF removed, no browser can rotate them on its own.
+        const bitmap = await createImageBitmap(
+            new Blob([withoutExif(jpeg)], { type: 'image/jpeg' }),
+        );
+        const orientation = previewOrientation(
+            found.orientation !== 1
+                ? found.orientation
+                : (jpegOrientation(jpeg) ?? 1),
+            found.rawIsLandscape,
+            bitmap.width >= bitmap.height,
+        );
+        const blob = await drawUpright(bitmap, orientation);
         bitmap.close();
 
         if (!blob) {
@@ -65,9 +80,33 @@ export async function rawPhotoToJpeg(file: File): Promise<File | null> {
     }
 }
 
-function findPreview(
-    view: DataView,
-): { preview: Preview; orientation: number } | null {
+/**
+ * The rotation still needed for the preview. Orientations 5–8 turn the picture sideways; if the preview's
+ * shape already differs from the raw sensor image, it was stored upright and must not be turned again.
+ */
+function previewOrientation(
+    stated: number,
+    rawIsLandscape: boolean | null,
+    previewIsLandscape: boolean,
+): number {
+    const turnsSideways = stated >= 5 && stated <= 8;
+
+    if (
+        turnsSideways &&
+        rawIsLandscape !== null &&
+        rawIsLandscape !== previewIsLandscape
+    ) {
+        return 1;
+    }
+
+    return stated;
+}
+
+function findPreview(view: DataView): {
+    preview: Preview;
+    orientation: number;
+    rawIsLandscape: boolean | null;
+} | null {
     const byteOrder = String.fromCharCode(view.getUint8(0), view.getUint8(1));
 
     if (byteOrder !== 'II' && byteOrder !== 'MM') {
@@ -117,7 +156,124 @@ function findPreview(
     return {
         preview: previews[0],
         orientation: values(view, ifd0, Tag.Orientation, littleEndian)[0] ?? 1,
+        rawIsLandscape: rawShape(view, ifds, littleEndian),
     };
+}
+
+/**
+ * Whether the raw sensor image (CFA or LinearRaw) is wider than tall, or null when it can't be found.
+ */
+function rawShape(
+    view: DataView,
+    ifds: Ifd[],
+    littleEndian: boolean,
+): boolean | null {
+    for (const ifd of ifds) {
+        const photometric = values(view, ifd, Tag.Photometric, littleEndian)[0];
+        const width = values(view, ifd, Tag.ImageWidth, littleEndian)[0];
+        const height = values(view, ifd, Tag.ImageLength, littleEndian)[0];
+
+        if (
+            (photometric === 32803 || photometric === 34892) &&
+            width &&
+            height
+        ) {
+            return width >= height;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * The EXIF orientation inside a JPEG, if it has one.
+ */
+function jpegOrientation(jpeg: Uint8Array): number | null {
+    const view = new DataView(jpeg.buffer, jpeg.byteOffset, jpeg.byteLength);
+
+    for (const segment of jpegSegments(view)) {
+        if (
+            segment.marker === 0xffe1 &&
+            String.fromCharCode(
+                ...jpeg.subarray(segment.start + 4, segment.start + 8),
+            ) === 'Exif'
+        ) {
+            const tiff = segment.start + 10;
+            const littleEndian = view.getUint8(tiff) === 0x49;
+            const ifd = readIfd(
+                view,
+                tiff + view.getUint32(tiff + 4, littleEndian),
+                littleEndian,
+            );
+            const entry = ifd?.entries.get(Tag.Orientation);
+
+            return entry
+                ? view.getUint16(entry.valuePosition, littleEndian)
+                : null;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * A copy of the JPEG with its APP1 (EXIF/XMP) segments removed.
+ */
+function withoutExif(jpeg: Uint8Array): Uint8Array<ArrayBuffer> {
+    const view = new DataView(jpeg.buffer, jpeg.byteOffset, jpeg.byteLength);
+    const kept: Uint8Array[] = [jpeg.subarray(0, 2)];
+    let imageDataStart = 2;
+
+    for (const segment of jpegSegments(view)) {
+        if (segment.marker !== 0xffe1) {
+            kept.push(jpeg.subarray(segment.start, segment.end));
+        }
+
+        imageDataStart = segment.end;
+    }
+
+    kept.push(jpeg.subarray(imageDataStart));
+
+    const result = new Uint8Array(
+        kept.reduce((total, part) => total + part.length, 0),
+    );
+    let offset = 0;
+
+    for (const part of kept) {
+        result.set(part, offset);
+        offset += part.length;
+    }
+
+    return result;
+}
+
+/**
+ * Header segments of a JPEG, up to (not including) the start of image data.
+ */
+function jpegSegments(
+    view: DataView,
+): { marker: number; start: number; end: number }[] {
+    const segments: { marker: number; start: number; end: number }[] = [];
+
+    if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) {
+        return segments;
+    }
+
+    let offset = 2;
+
+    while (offset + 4 <= view.byteLength) {
+        const marker = view.getUint16(offset);
+
+        if (marker === 0xffda || (marker & 0xff00) !== 0xff00) {
+            break;
+        }
+
+        const end = offset + 2 + view.getUint16(offset + 2);
+        segments.push({ marker, start: offset, end });
+        offset = end;
+    }
+
+    return segments;
 }
 
 /**

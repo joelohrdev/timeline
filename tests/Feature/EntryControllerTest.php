@@ -335,3 +335,16 @@ test('the new entry form knows which days the user has already posted', function
         ->get(route('entries.create'))
         ->assertInertia(fn (Assert $page) => $page->where('postedDays', ['2026-07-04' => $entry->id]));
 });
+
+test('a portrait HEIC photo stays portrait', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [new UploadedFile(base_path('tests/Fixtures/portrait.heic'), 'portrait.heic', 'image/heic', null, true)],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $image = Entry::sole()->images->sole();
+
+    expect([$image->width, $image->height])->toBe([800, 1200]);
+})->skip(fn () => ! app(StoreEntryImage::class)->canReadHeif(), 'Imagick on this machine cannot read HEIC');

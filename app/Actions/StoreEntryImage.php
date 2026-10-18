@@ -90,7 +90,10 @@ class StoreEntryImage
     }
 
     /**
-     * Load an upload with GD. HEIC/HEIF is decoded (and auto-oriented) by Imagick first, so resizing and WebP encoding stay on one path.
+     * Load an upload with GD. HEIC/HEIF is decoded by Imagick first, so resizing and WebP encoding stay on one path.
+     *
+     * HEIF stores rotation in the container ("irot"), which libheif applies while decoding. iPhones also write an
+     * EXIF orientation that describes the same rotation, so auto-orienting from EXIF as well would turn portraits sideways.
      */
     private function read(UploadedFile $file): ImageInterface
     {
@@ -98,7 +101,7 @@ class StoreEntryImage
             return ImageManager::gd()->read($file->getRealPath());
         }
 
-        $decoded = ImageManager::imagick()
+        $decoded = ImageManager::imagick(autoOrientation: false)
             ->read($file->getRealPath())
             ->scaleDown(self::DisplaySize, self::DisplaySize)
             ->toPng();
