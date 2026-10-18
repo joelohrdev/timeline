@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\StoreEntryImage;
 use App\EntryCategory;
 use App\Models\Entry;
 use App\Models\EntryImage;
@@ -295,4 +296,32 @@ test('a malformed cover choice is rejected', function () {
     $this->actingAs(User::factory()->create())
         ->post(route('entries.store'), ['date' => '2026-10-17', 'cover' => 'banana'])
         ->assertSessionHasErrors('cover');
+});
+
+test('an iPhone HEIC photo is converted to WebP', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [new UploadedFile(base_path('tests/Fixtures/photo.heic'), 'photo.heic', 'image/heic', null, true)],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $image = Entry::sole()->images->sole();
+
+    expect([$image->width, $image->height])->toBe([1200, 800])
+        ->and($this->disk->mimeType($image->path))->toBe('image/webp')
+        ->and($this->disk->mimeType($image->thumb_path))->toBe('image/webp');
+})->skip(fn () => ! app(StoreEntryImage::class)->canReadHeif(), 'Imagick on this machine cannot read HEIC');
+
+test('HEIC photos get a clear error when the server cannot read them', function () {
+    $this->partialMock(StoreEntryImage::class, fn ($mock) => $mock->shouldReceive('canReadHeif')->andReturn(false));
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'images' => [new UploadedFile(base_path('tests/Fixtures/photo.heic'), 'photo.heic', 'image/heic', null, true)],
+        ])
+        ->assertSessionHasErrors(['images.0' => "This server can't read HEIC photos yet. Choose them as JPEG instead."]);
+
+    expect(Entry::count())->toBe(0);
 });

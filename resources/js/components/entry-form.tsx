@@ -249,7 +249,7 @@ export function EntryForm({
                                     : 'Choose photos'}
                             </span>
                             <span className="text-xs">
-                                JPG, PNG or WebP · saved as WebP
+                                JPG, PNG, WebP or HEIC, saved as WebP
                             </span>
                         </label>
                         <input
@@ -258,7 +258,7 @@ export function EntryForm({
                             type="file"
                             name="images[]"
                             multiple
-                            accept="image/jpeg,image/png,image/webp"
+                            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
                             onChange={(event) => addFiles(event.target.files)}
                             className="sr-only"
                         />

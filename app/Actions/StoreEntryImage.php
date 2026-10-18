@@ -8,7 +8,10 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Exceptions\DriverException;
+use Intervention\Image\Format;
 use Intervention\Image\ImageManager;
+use Intervention\Image\Interfaces\ImageInterface;
 use RuntimeException;
 
 class StoreEntryImage
@@ -18,13 +21,18 @@ class StoreEntryImage
     public const int ThumbSize = 600;
 
     /**
+     * iPhone photo formats (HEVC-encoded) that GD cannot read.
+     */
+    public const array HeifMimeTypes = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
+
+    /**
      * Convert an upload to WebP (display + thumbnail) and attach it to the entry.
      *
      * Re-encoding through GD auto-orients the image and drops EXIF metadata such as GPS location.
      */
     public function handle(Entry $entry, UploadedFile $file, int $position): EntryImage
     {
-        $image = ImageManager::gd()->read($file->getRealPath());
+        $image = $this->read($file);
 
         $basePath = 'entries/'.$entry->date->format('Y-m-d').'/'.Str::uuid();
         $disk = Storage::disk(config('filesystems.media_disk'));
@@ -44,6 +52,40 @@ class StoreEntryImage
             'height' => $height,
             'position' => $position,
         ]);
+    }
+
+    /**
+     * Whether this server's Imagick can decode HEIC/HEIF photos.
+     */
+    public function canReadHeif(): bool
+    {
+        try {
+            return ImageManager::imagick()->driver()->supports(Format::HEIC);
+        } catch (DriverException) {
+            return false;
+        }
+    }
+
+    public function isHeif(UploadedFile $file): bool
+    {
+        return in_array($file->getMimeType(), self::HeifMimeTypes, true);
+    }
+
+    /**
+     * Load an upload with GD. HEIC/HEIF is decoded (and auto-oriented) by Imagick first, so resizing and WebP encoding stay on one path.
+     */
+    private function read(UploadedFile $file): ImageInterface
+    {
+        if (! $this->isHeif($file)) {
+            return ImageManager::gd()->read($file->getRealPath());
+        }
+
+        $decoded = ImageManager::imagick()
+            ->read($file->getRealPath())
+            ->scaleDown(self::DisplaySize, self::DisplaySize)
+            ->toPng();
+
+        return ImageManager::gd()->read((string) $decoded);
     }
 
     /**

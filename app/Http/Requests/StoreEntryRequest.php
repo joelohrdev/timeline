@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Concerns\EntryCategoryRules;
+use App\Rules\ReadableHeifPhoto;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,7 @@ class StoreEntryRequest extends FormRequest
             'date' => ['required', 'date_format:Y-m-d', Rule::unique('entries', 'date')],
             'body' => ['nullable', 'string', 'max:10000'],
             'images' => ['nullable', 'array', 'max:10'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'images.*' => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif', 'max:15360', new ReadableHeifPhoto],
             'cover' => ['nullable', 'string', 'regex:/^(image|upload):\d+$/'],
             ...$this->categoryRules(),
         ];
