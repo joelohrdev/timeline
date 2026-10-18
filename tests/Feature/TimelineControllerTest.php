@@ -15,11 +15,11 @@ test('guests see entries newest day first', function () {
 });
 
 test('older days are served on the next page for infinite scroll', function () {
-    Entry::factory()->count(12)->create();
+    Entry::factory()->count(42)->create();
 
     $this->get(route('home'))
         ->assertInertia(fn (Assert $page) => $page
-            ->has('entries.data', 10));
+            ->has('entries.data', 40));
 
     $this->get(route('home', ['page' => 2]))
         ->assertInertia(fn (Assert $page) => $page

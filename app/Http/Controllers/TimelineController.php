@@ -17,7 +17,7 @@ class TimelineController extends Controller
             'entries' => Inertia::scroll(fn () => Entry::query()
                 ->with('images')
                 ->latest('date')
-                ->paginate(10)),
+                ->paginate(40)),
         ]);
     }
 }

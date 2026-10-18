@@ -9,9 +9,11 @@ export default function CreateEntry({
     holidays,
 }: CategoryOptions & { today: string }) {
     return (
-        <>
+        <div className="max-w-xl">
             <Head title="New entry" />
-            <h1 className="mb-8 text-lg font-medium">New entry</h1>
+            <h1 className="mb-8 font-display text-4xl tracking-tight">
+                New entry
+            </h1>
             <EntryForm
                 form={EntryController.store.form()}
                 defaultDate={today}
@@ -19,6 +21,6 @@ export default function CreateEntry({
                 holidays={holidays}
                 submitLabel="Post entry"
             />
-        </>
+        </div>
     );
 }

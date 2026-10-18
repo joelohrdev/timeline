@@ -17,9 +17,11 @@ export default function EditEntry({
     };
 
     return (
-        <>
+        <div className="max-w-xl">
             <Head title="Edit entry" />
-            <h1 className="mb-8 text-lg font-medium">Edit entry</h1>
+            <h1 className="mb-8 font-display text-4xl tracking-tight">
+                Edit entry
+            </h1>
             <EntryForm
                 form={EntryController.update.form(entry.id)}
                 entry={entry}
@@ -33,6 +35,6 @@ export default function EditEntry({
                     Delete entry
                 </Button>
             </div>
-        </>
+        </div>
     );
 }

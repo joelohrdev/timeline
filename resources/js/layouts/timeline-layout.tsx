@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,19 +21,20 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
     const getInitials = useInitials();
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <header className="border-b border-border/60">
-                <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
+        <div className="min-h-screen bg-paper text-ink">
+            <header>
+                <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:h-20">
                     <Link
                         href={home()}
-                        className="text-[15px] font-medium tracking-tight"
+                        className="flex items-center gap-2 rounded-sm font-display text-2xl tracking-tight focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-4 focus-visible:ring-offset-paper focus-visible:outline-none"
                     >
+                        <AppLogoIcon className="size-7 text-ink" />
                         {name}
                     </Link>
 
                     {user ? (
                         <div className="flex items-center gap-2">
-                            <Button asChild variant="outline" size="sm">
+                            <Button asChild size="sm">
                                 <Link href={create()}>
                                     <Plus />
                                     New entry
@@ -66,7 +68,7 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
                     ) : (
                         <Link
                             href={login()}
-                            className="text-sm text-muted-foreground hover:text-foreground"
+                            className="text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
                         >
                             Log in
                         </Link>
@@ -74,7 +76,9 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-2xl px-4 py-10">{children}</main>
+            <main className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:pt-10">
+                {children}
+            </main>
         </div>
     );
 }
