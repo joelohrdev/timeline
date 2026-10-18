@@ -1,4 +1,5 @@
 import { Head, InfiniteScroll, Link, usePage } from '@inertiajs/react';
+import { BackToTop } from '@/components/back-to-top';
 import { TimelineEntry, TimelineRow } from '@/components/timeline-entry';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,6 +66,7 @@ export default function Timeline({ entries }: { entries: Paginated<Entry> }) {
                     ))}
                 </InfiniteScroll>
             </div>
+            <BackToTop />
         </>
     );
 }
