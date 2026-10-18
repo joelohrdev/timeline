@@ -14,6 +14,11 @@ import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
 
+type ChosenPhoto = {
+    file: File;
+    url: string;
+};
+
 type Props = CategoryOptions & {
     form: RouteFormDefinition<'post'>;
     entry?: Entry;
@@ -29,7 +34,9 @@ export function EntryForm({
     categories,
     holidays,
 }: Props) {
-    const [previews, setPreviews] = useState<string[]>([]);
+    const [chosen, setChosen] = useState<ChosenPhoto[]>([]);
+    const chosenRef = useRef<ChosenPhoto[]>([]);
+    const fileInput = useRef<HTMLInputElement>(null);
     const [cover, setCover] = useState<string | null>(null);
     const [date, setDate] = useState(entry?.date ?? defaultDate);
     const [dateFromPhoto, setDateFromPhoto] = useState<string | null>(null);
@@ -39,26 +46,58 @@ export function EntryForm({
         cover ??
         (existingImages[0]
             ? `image:${existingImages[0].id}`
-            : previews.length > 0
+            : chosen.length > 0
               ? 'upload:0'
               : null);
-    const photoCount = existingImages.length + previews.length;
+    const photoCount = existingImages.length + chosen.length;
 
     useEffect(() => {
-        return () => previews.forEach((url) => URL.revokeObjectURL(url));
-    }, [previews]);
+        return () =>
+            chosenRef.current.forEach((photo) =>
+                URL.revokeObjectURL(photo.url),
+            );
+    }, []);
 
-    const selectFiles = (files: FileList | null) => {
-        if (cover?.startsWith('upload:')) {
-            setCover(null);
+    /**
+     * Keep the chosen photos in state and mirror them into the file input the form submits.
+     */
+    const updateChosen = (next: ChosenPhoto[]) => {
+        const transfer = new DataTransfer();
+        next.forEach((photo) => transfer.items.add(photo.file));
+
+        if (fileInput.current) {
+            fileInput.current.files = transfer.files;
         }
 
-        const selected = Array.from(files ?? []);
+        chosenRef.current = next;
+        setChosen(next);
+    };
 
-        setPreviews(selected.map((file) => URL.createObjectURL(file)));
+    const addFiles = (files: FileList | null) => {
+        const added = Array.from(files ?? []);
 
-        if (!entry) {
-            void setDateFromFirstPhoto(selected);
+        updateChosen([
+            ...chosenRef.current,
+            ...added.map((file) => ({ file, url: URL.createObjectURL(file) })),
+        ]);
+
+        if (!entry && chosenRef.current.length === added.length) {
+            void setDateFromFirstPhoto(added);
+        }
+    };
+
+    const removeChosen = (index: number) => {
+        URL.revokeObjectURL(chosen[index].url);
+        updateChosen(chosen.filter((_, position) => position !== index));
+
+        if (cover === `upload:${index}`) {
+            setCover(null);
+        } else if (cover?.startsWith('upload:')) {
+            const coverIndex = Number(cover.slice('upload:'.length));
+
+            if (coverIndex > index) {
+                setCover(`upload:${coverIndex - 1}`);
+            }
         }
     };
 
@@ -85,7 +124,7 @@ export function EntryForm({
     };
 
     const removeImage = (imageId: number) => {
-        if (!entry || !window.confirm('Remove this image?')) {
+        if (!entry || !window.confirm('Remove this photo from the entry?')) {
             return;
         }
 
@@ -103,7 +142,10 @@ export function EntryForm({
             {...form}
             options={{ preserveScroll: 'errors' }}
             onSuccess={() => {
-                setPreviews([]);
+                chosenRef.current.forEach((photo) =>
+                    URL.revokeObjectURL(photo.url),
+                );
+                updateChosen([]);
                 setCover(null);
             }}
             className="space-y-6"
@@ -162,29 +204,29 @@ export function EntryForm({
                                                 setCover(`image:${image.id}`)
                                             }
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() =>
+                                        <RemovePhotoButton
+                                            onRemove={() =>
                                                 removeImage(image.id)
                                             }
-                                            aria-label="Remove image"
-                                            className="absolute top-1 right-1 rounded-full bg-background/90 p-1 text-foreground shadow-sm hover:bg-background"
-                                        >
-                                            <X className="size-3.5" />
-                                        </button>
+                                        />
                                     </div>
                                 ))}
-                                {previews.map((url, index) => (
-                                    <CoverTile
-                                        key={url}
-                                        src={url}
-                                        isCover={
-                                            effectiveCover === `upload:${index}`
-                                        }
-                                        onSelect={() =>
-                                            setCover(`upload:${index}`)
-                                        }
-                                    />
+                                {chosen.map((photo, index) => (
+                                    <div key={photo.url} className="relative">
+                                        <CoverTile
+                                            src={photo.url}
+                                            isCover={
+                                                effectiveCover ===
+                                                `upload:${index}`
+                                            }
+                                            onSelect={() =>
+                                                setCover(`upload:${index}`)
+                                            }
+                                        />
+                                        <RemovePhotoButton
+                                            onRemove={() => removeChosen(index)}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -201,20 +243,23 @@ export function EntryForm({
                             className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input px-4 py-8 text-sm text-muted-foreground hover:border-ring hover:text-foreground"
                         >
                             <ImagePlus className="size-5" />
-                            <span>Choose photos</span>
+                            <span>
+                                {photoCount > 0
+                                    ? 'Add more photos'
+                                    : 'Choose photos'}
+                            </span>
                             <span className="text-xs">
                                 JPG, PNG or WebP · saved as WebP
                             </span>
                         </label>
                         <input
+                            ref={fileInput}
                             id="images"
                             type="file"
                             name="images[]"
                             multiple
                             accept="image/jpeg,image/png,image/webp"
-                            onChange={(event) =>
-                                selectFiles(event.target.files)
-                            }
+                            onChange={(event) => addFiles(event.target.files)}
                             className="sr-only"
                         />
 
@@ -277,6 +322,19 @@ function CoverTile({
                     Cover
                 </span>
             )}
+        </button>
+    );
+}
+
+function RemovePhotoButton({ onRemove }: { onRemove: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove photo"
+            className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-background/90 text-foreground shadow-sm hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+            <X className="size-4" />
         </button>
     );
 }
