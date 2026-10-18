@@ -16,8 +16,11 @@ const weekdays = [
 type Props = {
     month: string;
     entries: Entry[];
+    highlightDate?: string | null;
     onOpen: (entry: Entry) => void;
 };
+
+const highlightRing = 'ring-2 ring-ink ring-offset-2 ring-offset-paper';
 
 function dayKey(month: string, day: number): string {
     return `${month}-${String(day).padStart(2, '0')}`;
@@ -45,7 +48,15 @@ function CategoryMarker({ entry }: { entry: Entry }) {
     );
 }
 
-function EntryCell({ entry, onOpen }: { entry: Entry; onOpen: () => void }) {
+function EntryCell({
+    entry,
+    highlighted,
+    onOpen,
+}: {
+    entry: Entry;
+    highlighted: boolean;
+    onOpen: () => void;
+}) {
     const hero = entry.images[0];
     const day = parseEntryDate(entry.date);
     const label = day.toLocaleDateString(undefined, {
@@ -63,6 +74,7 @@ function EntryCell({ entry, onOpen }: { entry: Entry; onOpen: () => void }) {
                 'group relative flex aspect-square cursor-pointer flex-col items-start justify-start overflow-hidden rounded-sm text-left sm:rounded-md',
                 'focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper focus-visible:outline-none',
                 hero ? 'bg-cell' : 'bg-ink text-paper',
+                highlighted && highlightRing,
             )}
         >
             {hero && (
@@ -94,7 +106,12 @@ function EntryCell({ entry, onOpen }: { entry: Entry; onOpen: () => void }) {
     );
 }
 
-export function MonthCalendar({ month, entries, onOpen }: Props) {
+export function MonthCalendar({
+    month,
+    entries,
+    highlightDate,
+    onOpen,
+}: Props) {
     const first = parseEntryDate(`${month}-01`);
     const daysInMonth = new Date(
         first.getFullYear(),
@@ -153,6 +170,7 @@ export function MonthCalendar({ month, entries, onOpen }: Props) {
                             <EntryCell
                                 key={key}
                                 entry={entry}
+                                highlighted={key === highlightDate}
                                 onOpen={() => onOpen(entry)}
                             />
                         );
@@ -166,6 +184,7 @@ export function MonthCalendar({ month, entries, onOpen }: Props) {
                                 key > today ? 'opacity-40' : 'bg-cell',
                                 key === today &&
                                     'ring-1 ring-ink/40 ring-inset',
+                                key === highlightDate && highlightRing,
                             )}
                         >
                             {day}

@@ -2,10 +2,12 @@ import { Head, InfiniteScroll, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { BackToTop } from '@/components/back-to-top';
 import { DaySheet } from '@/components/day-sheet';
+import { FindDay } from '@/components/find-day';
 import { MonthCalendar } from '@/components/month-calendar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { monthKey } from '@/lib/dates';
+import { monthKey, parseEntryDate } from '@/lib/dates';
+import { home } from '@/routes';
 import { create } from '@/routes/entries';
 import type { Entry, Paginated, User } from '@/types';
 
@@ -41,9 +43,78 @@ function groupByMonth(entries: Entry[]): [string, Entry[]][] {
     return [...months.entries()];
 }
 
-export default function Timeline({ entries }: { entries: Paginated<Entry> }) {
+type Props = {
+    entries: Paginated<Entry>;
+    jumpedTo: string | null;
+    firstDate: string | null;
+};
+
+function SearchSummary({
+    jumpedTo,
+    found,
+}: {
+    jumpedTo: string;
+    found: boolean;
+}) {
+    const date = parseEntryDate(jumpedTo);
+    const month = date.toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+    });
+
+    return (
+        <p className="text-sm text-ink-soft">
+            {found
+                ? `Showing ${month} and earlier.`
+                : `Nothing was posted on ${date.toLocaleDateString(undefined, { dateStyle: 'long' })}. Showing ${month} and earlier.`}{' '}
+            <Link
+                href={home()}
+                className="text-ink underline underline-offset-4 hover:no-underline"
+            >
+                Back to latest
+            </Link>
+        </p>
+    );
+}
+
+export default function Timeline({ entries, jumpedTo, firstDate }: Props) {
     const user = usePage().props.auth.user as User | null;
     const [openId, setOpenId] = useState<number | null>(null);
+    const [handledJump, setHandledJump] = useState<string | null>(null);
+    const jumpedEntry = jumpedTo
+        ? (entries.data.find((entry) => entry.date === jumpedTo) ?? null)
+        : null;
+
+    if (jumpedTo !== handledJump) {
+        setHandledJump(jumpedTo);
+        setOpenId(jumpedEntry?.id ?? null);
+    }
+
+    if (entries.data.length === 0 && jumpedTo) {
+        return (
+            <>
+                <Head title="Timeline" />
+                <div className="py-24">
+                    <h1 className="font-display text-5xl tracking-tight text-ink">
+                        Before the first post
+                    </h1>
+                    <p className="mt-3 max-w-sm text-ink-soft">
+                        Nothing was posted on or before{' '}
+                        {parseEntryDate(jumpedTo).toLocaleDateString(
+                            undefined,
+                            {
+                                dateStyle: 'long',
+                            },
+                        )}
+                        .
+                    </p>
+                    <Button asChild variant="outline" className="mt-8">
+                        <Link href={home()}>Back to latest</Link>
+                    </Button>
+                </div>
+            </>
+        );
+    }
 
     if (entries.data.length === 0) {
         return (
@@ -72,6 +143,18 @@ export default function Timeline({ entries }: { entries: Paginated<Entry> }) {
     return (
         <>
             <Head title="Timeline" />
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-3 sm:mb-10">
+                <div>
+                    {jumpedTo && (
+                        <SearchSummary
+                            jumpedTo={jumpedTo}
+                            found={jumpedEntry !== null}
+                        />
+                    )}
+                </div>
+                <FindDay firstDate={firstDate} selected={jumpedTo} />
+            </div>
+
             <InfiniteScroll
                 data="entries"
                 buffer={800}
@@ -83,6 +166,7 @@ export default function Timeline({ entries }: { entries: Paginated<Entry> }) {
                         key={month}
                         month={month}
                         entries={monthEntries}
+                        highlightDate={jumpedTo}
                         onOpen={(entry) => setOpenId(entry.id)}
                     />
                 ))}
