@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Actions\StoreEntryImage;
+use App\EntryCategory;
 use App\Models\Entry;
 use App\Models\User;
 use GdImage;
@@ -30,6 +31,24 @@ class TimelineSeeder extends Seeder
         '<p>Fixed the gate latch, finally.</p>',
         null,
         '<p>Hiked to the <a href="https://www.nps.gov">overlook</a>. Fog sat in the valley the whole time and never burned off.</p><ol><li><p>Trailhead at 7</p></li><li><p>Summit by 9</p></li><li><p>Pancakes by 11</p></li></ol>',
+    ];
+
+    /**
+     * Categories for a handful of seeded entries, keyed by position on the timeline, so each style shows up.
+     *
+     * @var array<int, array{category: EntryCategory, details: array<string, int|string|null>}>
+     */
+    private const array Categories = [
+        1 => ['category' => EntryCategory::BaseballGame, 'details' => ['opponent' => 'Tigers', 'our_score' => 8, 'their_score' => 5]],
+        3 => ['category' => EntryCategory::Holiday, 'details' => ['holiday' => 'halloween']],
+        5 => ['category' => EntryCategory::Birthday, 'details' => ['name' => 'Emma', 'age' => 7]],
+        7 => ['category' => EntryCategory::BaseballGame, 'details' => ['opponent' => 'Cardinals', 'our_score' => 2, 'their_score' => 6]],
+        9 => ['category' => EntryCategory::Holiday, 'details' => ['holiday' => 'thanksgiving']],
+        11 => ['category' => EntryCategory::Holiday, 'details' => ['holiday' => 'christmas']],
+        13 => ['category' => EntryCategory::BaseballGame, 'details' => ['opponent' => 'Rockets', 'our_score' => 4, 'their_score' => 4]],
+        15 => ['category' => EntryCategory::Birthday, 'details' => ['name' => 'Grandpa', 'age' => null]],
+        17 => ['category' => EntryCategory::Holiday, 'details' => ['holiday' => 'independence_day']],
+        20 => ['category' => EntryCategory::Holiday, 'details' => ['holiday' => 'st_patricks_day']],
     ];
 
     /**
@@ -68,6 +87,7 @@ class TimelineSeeder extends Seeder
             $entry = $user->entries()->create([
                 'date' => $date->toDateString(),
                 'body' => self::Bodies[$index % count(self::Bodies)],
+                ...self::Categories[$index] ?? [],
             ]);
 
             $imageCount = fake()->randomElement([0, 1, 1, 1, 2, 3, 4]);

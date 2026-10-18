@@ -1,6 +1,8 @@
 import { Form, router } from '@inertiajs/react';
 import { ImagePlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { CategoryFields } from '@/components/category-fields';
+import type { CategoryOptions } from '@/components/category-fields';
 import { DatePicker } from '@/components/date-picker';
 import InputError from '@/components/input-error';
 import { RichTextEditor } from '@/components/rich-text-editor';
@@ -10,14 +12,21 @@ import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
 
-type Props = {
+type Props = CategoryOptions & {
     form: RouteFormDefinition<'post'>;
     entry?: Entry;
     defaultDate: string;
     submitLabel: string;
 };
 
-export function EntryForm({ form, entry, defaultDate, submitLabel }: Props) {
+export function EntryForm({
+    form,
+    entry,
+    defaultDate,
+    submitLabel,
+    categories,
+    holidays,
+}: Props) {
     const [previews, setPreviews] = useState<string[]>([]);
 
     useEffect(() => {
@@ -59,6 +68,13 @@ export function EntryForm({ form, entry, defaultDate, submitLabel }: Props) {
                         />
                         <InputError message={errors.date} />
                     </div>
+
+                    <CategoryFields
+                        categories={categories}
+                        holidays={holidays}
+                        entry={entry}
+                        errors={errors}
+                    />
 
                     <div className="grid gap-2">
                         <Label htmlFor="body">What happened</Label>

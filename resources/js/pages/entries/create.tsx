@@ -1,8 +1,13 @@
 import { Head } from '@inertiajs/react';
 import EntryController from '@/actions/App/Http/Controllers/EntryController';
+import type { CategoryOptions } from '@/components/category-fields';
 import { EntryForm } from '@/components/entry-form';
 
-export default function CreateEntry({ today }: { today: string }) {
+export default function CreateEntry({
+    today,
+    categories,
+    holidays,
+}: CategoryOptions & { today: string }) {
     return (
         <>
             <Head title="New entry" />
@@ -10,6 +15,8 @@ export default function CreateEntry({ today }: { today: string }) {
             <EntryForm
                 form={EntryController.store.form()}
                 defaultDate={today}
+                categories={categories}
+                holidays={holidays}
                 submitLabel="Post entry"
             />
         </>

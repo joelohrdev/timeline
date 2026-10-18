@@ -1,10 +1,15 @@
 import { Head, router } from '@inertiajs/react';
 import EntryController from '@/actions/App/Http/Controllers/EntryController';
+import type { CategoryOptions } from '@/components/category-fields';
 import { EntryForm } from '@/components/entry-form';
 import { Button } from '@/components/ui/button';
 import type { Entry } from '@/types';
 
-export default function EditEntry({ entry }: { entry: Entry }) {
+export default function EditEntry({
+    entry,
+    categories,
+    holidays,
+}: CategoryOptions & { entry: Entry }) {
     const deleteEntry = () => {
         if (window.confirm('Delete this entry and all of its photos?')) {
             router.delete(EntryController.destroy(entry.id));
@@ -19,6 +24,8 @@ export default function EditEntry({ entry }: { entry: Entry }) {
                 form={EntryController.update.form(entry.id)}
                 entry={entry}
                 defaultDate={entry.date}
+                categories={categories}
+                holidays={holidays}
                 submitLabel="Save changes"
             />
             <div className="mt-12 border-t pt-6">

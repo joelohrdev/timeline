@@ -1,5 +1,6 @@
 <?php
 
+use App\EntryCategory;
 use App\Models\Entry;
 use App\Models\EntryImage;
 use App\Models\User;
@@ -130,4 +131,92 @@ test('an editor body with no text is stored as empty', function () {
         ->assertSessionHasNoErrors();
 
     expect(Entry::sole()->body)->toBeNull();
+});
+
+test('a holiday entry stores which holiday it was', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-31',
+            'category' => 'holiday',
+            'details' => ['holiday' => 'halloween'],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $entry = Entry::sole();
+
+    expect($entry->category)->toBe(EntryCategory::Holiday)
+        ->and($entry->details)->toBe(['holiday' => 'halloween']);
+});
+
+test('a baseball game entry stores the opponent and both scores as numbers', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'category' => 'baseball_game',
+            'details' => ['opponent' => 'Tigers', 'our_score' => '8', 'their_score' => '5'],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->details)->toBe(['opponent' => 'Tigers', 'our_score' => 8, 'their_score' => 5]);
+});
+
+test('a baseball game entry requires both scores', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'category' => 'baseball_game',
+            'details' => ['opponent' => 'Tigers', 'our_score' => '8'],
+        ])
+        ->assertSessionHasErrors(['details.their_score' => 'The their score field is required.']);
+
+    expect(Entry::count())->toBe(0);
+});
+
+test('a birthday entry requires a name but not an age', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'category' => 'birthday', 'details' => ['age' => '7']])
+        ->assertSessionHasErrors(['details.name' => 'The name field is required.']);
+
+    $this->actingAs($user)
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'category' => 'birthday', 'details' => ['name' => 'Grandpa']])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->details)->toBe(['name' => 'Grandpa', 'age' => null]);
+});
+
+test('unknown categories and holidays are rejected', function (array $input, string $field) {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), ['date' => '2026-10-17', ...$input])
+        ->assertSessionHasErrors($field);
+})->with([
+    'category' => [['category' => 'wedding'], 'category'],
+    'holiday' => [['category' => 'holiday', 'details' => ['holiday' => 'groundhog_day']], 'details.holiday'],
+]);
+
+test('changing an entry to another category drops the old category fields', function () {
+    $entry = Entry::factory()->baseballGame()->create(['date' => '2026-10-17']);
+
+    $this->actingAs($entry->user)
+        ->put(route('entries.update', $entry), [
+            'date' => '2026-10-17',
+            'category' => 'birthday',
+            'details' => ['name' => 'Emma', 'age' => '7', 'opponent' => 'Tigers', 'our_score' => '8', 'their_score' => '5'],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->refresh()->category)->toBe(EntryCategory::Birthday)
+        ->and($entry->details)->toBe(['name' => 'Emma', 'age' => 7]);
+});
+
+test('clearing the category removes its fields', function () {
+    $entry = Entry::factory()->holiday()->create(['date' => '2026-10-17']);
+
+    $this->actingAs($entry->user)
+        ->put(route('entries.update', $entry), ['date' => '2026-10-17', 'category' => '', 'details' => ['holiday' => 'halloween']])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->refresh()->category)->toBeNull()
+        ->and($entry->details)->toBeNull();
 });

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\SanitizeEntryBody;
+use App\EntryCategory;
 use Database\Factories\EntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -16,11 +17,13 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property Carbon $date
+ * @property EntryCategory|null $category
+ * @property array<string, int|string|null>|null $details
  * @property string|null $body
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['date', 'body'])]
+#[Fillable(['date', 'category', 'details', 'body'])]
 class Entry extends Model
 {
     /** @use HasFactory<EntryFactory> */
@@ -45,6 +48,8 @@ class Entry extends Model
     {
         return [
             'date' => 'date:Y-m-d',
+            'category' => EntryCategory::class,
+            'details' => 'array',
         ];
     }
 
