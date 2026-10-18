@@ -138,11 +138,19 @@ function categoryHeadline(
     }
 
     if (entry.category === 'baseball_game') {
-        const ours = details.our_score ?? 0;
-        const theirs = details.their_score ?? 0;
+        const ours = details.our_score;
+        const theirs = details.their_score;
+        const against = details.opponent
+            ? ` against the ${details.opponent}`
+            : '';
+
+        if (typeof ours !== 'number' || typeof theirs !== 'number') {
+            return details.opponent ? `Game${against}` : 'Ball game';
+        }
+
         const result = ours > theirs ? 'Won' : ours < theirs ? 'Lost' : 'Tied';
 
-        return `${result} ${ours}–${theirs} against the ${details.opponent}`;
+        return `${result} ${ours}–${theirs}${against}`;
     }
 
     return theme.label;

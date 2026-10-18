@@ -24,6 +24,7 @@ class YearController extends Controller
             ->get();
 
         $games = $entries->where('category', EntryCategory::BaseballGame)->values();
+        $scored = $games->filter(fn (Entry $game): bool => $this->score($game, 'our_score') !== null && $this->score($game, 'their_score') !== null);
 
         return Inertia::render('year', [
             'year' => $year,
@@ -48,9 +49,10 @@ class YearController extends Controller
                 ];
             }),
             'games' => [
-                'wins' => $games->filter(fn (Entry $game): bool => $this->score($game, 'our_score') > $this->score($game, 'their_score'))->count(),
-                'losses' => $games->filter(fn (Entry $game): bool => $this->score($game, 'our_score') < $this->score($game, 'their_score'))->count(),
-                'ties' => $games->filter(fn (Entry $game): bool => $this->score($game, 'our_score') === $this->score($game, 'their_score'))->count(),
+                'wins' => $scored->filter(fn (Entry $game): bool => $this->score($game, 'our_score') > $this->score($game, 'their_score'))->count(),
+                'losses' => $scored->filter(fn (Entry $game): bool => $this->score($game, 'our_score') < $this->score($game, 'their_score'))->count(),
+                'ties' => $scored->filter(fn (Entry $game): bool => $this->score($game, 'our_score') === $this->score($game, 'their_score'))->count(),
+                'scored' => $scored->count(),
                 'list' => $games->map(fn (Entry $game): array => [
                     'date' => $game->date->toDateString(),
                     'opponent' => $game->details['opponent'] ?? null,
@@ -63,9 +65,12 @@ class YearController extends Controller
         ]);
     }
 
-    private function score(Entry $game, string $key): int
+    /**
+     * A game's score, or null when it wasn't entered.
+     */
+    private function score(Entry $game, string $key): ?int
     {
-        return (int) ($game->details[$key] ?? 0);
+        return isset($game->details[$key]) ? (int) $game->details[$key] : null;
     }
 
     /**

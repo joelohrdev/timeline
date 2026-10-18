@@ -1,5 +1,6 @@
 <?php
 
+use App\EntryCategory;
 use App\Holiday;
 use App\Models\Entry;
 use App\Models\EntryImage;
@@ -42,4 +43,22 @@ test('a year with nothing posted still renders', function () {
 
 test('a year must be a number', function () {
     $this->get('/years/last')->assertNotFound();
+});
+
+test('games without a score are listed but left out of the season record', function () {
+    Entry::factory()->baseballGame('Tigers', 8, 5)->create(['date' => '2026-04-11']);
+    Entry::factory()->create([
+        'date' => '2026-04-18',
+        'category' => EntryCategory::BaseballGame,
+        'details' => ['opponent' => 'Cardinals', 'our_score' => null, 'their_score' => null],
+    ]);
+
+    $this->get(route('years.show', 2026))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('games.wins', 1)
+            ->where('games.losses', 0)
+            ->where('games.ties', 0)
+            ->where('games.scored', 1)
+            ->has('games.list', 2)
+            ->where('games.list.1', ['date' => '2026-04-18', 'opponent' => 'Cardinals', 'our_score' => null, 'their_score' => null]));
 });

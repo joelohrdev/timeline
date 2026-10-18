@@ -11,8 +11,8 @@ type Month = { month: string; days: number; cover_url: string | null };
 type Game = {
     date: string;
     opponent: string | null;
-    our_score: number;
-    their_score: number;
+    our_score: number | null;
+    their_score: number | null;
 };
 
 type Listed = { date: string; label: string };
@@ -22,7 +22,13 @@ type Props = {
     years: number[];
     stats: { days: number; events: number; photos: number };
     months: Month[];
-    games: { wins: number; losses: number; ties: number; list: Game[] };
+    games: {
+        wins: number;
+        losses: number;
+        ties: number;
+        scored: number;
+        list: Game[];
+    };
     birthdays: Listed[];
     holidays: Listed[];
 };
@@ -185,21 +191,30 @@ export default function Year({
                             Ball games
                         </h2>
                         <p className="mt-1 text-ink-soft">
-                            {games.wins}–{games.losses}
-                            {games.ties > 0 && `–${games.ties}`} across{' '}
-                            {plural(gameCount, 'game', 'games')}
+                            {games.scored > 0
+                                ? `${games.wins}–${games.losses}${games.ties > 0 ? `–${games.ties}` : ''} across ${plural(games.scored, 'scored game', 'scored games')}`
+                                : plural(gameCount, 'game', 'games')}
+                            {games.scored > 0 &&
+                                gameCount > games.scored &&
+                                `, plus ${plural(gameCount - games.scored, 'game', 'games')} without a score`}
                         </p>
                         <ul className="mt-3 divide-y divide-ink/10">
                             {games.list.map((game) => {
-                                const result =
-                                    game.our_score > game.their_score
-                                        ? 'W'
-                                        : game.our_score < game.their_score
-                                          ? 'L'
-                                          : 'T';
+                                const scored =
+                                    game.our_score !== null &&
+                                    game.their_score !== null;
+                                const result = !scored
+                                    ? null
+                                    : game.our_score! > game.their_score!
+                                      ? 'W'
+                                      : game.our_score! < game.their_score!
+                                        ? 'L'
+                                        : 'T';
 
                                 return (
-                                    <li key={`${game.date}-${game.opponent}`}>
+                                    <li
+                                        key={`${game.date}-${game.opponent}-${game.our_score}`}
+                                    >
                                         <Link
                                             href={dayLink(game.date)}
                                             className="flex items-baseline justify-between gap-4 py-2.5 text-ink hover:underline hover:underline-offset-4"
@@ -208,8 +223,8 @@ export default function Year({
                                                 {game.opponent ?? 'Game'}
                                             </span>
                                             <span className="shrink-0 text-sm text-ink-soft tabular-nums">
-                                                {result} {game.our_score}–
-                                                {game.their_score},{' '}
+                                                {result &&
+                                                    `${result} ${game.our_score}–${game.their_score}, `}
                                                 {shortDate(game.date)}
                                             </span>
                                         </Link>

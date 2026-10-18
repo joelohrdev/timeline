@@ -25,9 +25,9 @@ trait EntryCategoryRules
             'details.holiday' => [$onlyFor(EntryCategory::Holiday), 'required', Rule::enum(Holiday::class)],
             'details.name' => [$onlyFor(EntryCategory::Birthday), 'required', 'string', 'max:60'],
             'details.age' => [$onlyFor(EntryCategory::Birthday), 'nullable', 'integer', 'min:0', 'max:130'],
-            'details.opponent' => [$onlyFor(EntryCategory::BaseballGame), 'required', 'string', 'max:80'],
-            'details.our_score' => [$onlyFor(EntryCategory::BaseballGame), 'required', 'integer', 'min:0', 'max:99'],
-            'details.their_score' => [$onlyFor(EntryCategory::BaseballGame), 'required', 'integer', 'min:0', 'max:99'],
+            'details.opponent' => [$onlyFor(EntryCategory::BaseballGame), 'nullable', 'string', 'max:80'],
+            'details.our_score' => [$onlyFor(EntryCategory::BaseballGame), 'nullable', 'integer', 'min:0', 'max:99'],
+            'details.their_score' => [$onlyFor(EntryCategory::BaseballGame), 'nullable', 'integer', 'min:0', 'max:99'],
         ];
     }
 
@@ -66,9 +66,9 @@ trait EntryCategoryRules
                     'age' => isset($details['age']) ? (int) $details['age'] : null,
                 ],
                 EntryCategory::BaseballGame => [
-                    'opponent' => $details['opponent'],
-                    'our_score' => (int) $details['our_score'],
-                    'their_score' => (int) $details['their_score'],
+                    'opponent' => filled($details['opponent'] ?? null) ? $details['opponent'] : null,
+                    'our_score' => isset($details['our_score']) ? (int) $details['our_score'] : null,
+                    'their_score' => isset($details['their_score']) ? (int) $details['their_score'] : null,
                 ],
                 default => $details,
             },

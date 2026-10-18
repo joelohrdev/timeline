@@ -185,6 +185,10 @@ export function CategoryFields({ categories, holidays, entry, errors }: Props) {
                             )}
                         />
                     </div>
+                    <p className="col-span-3 text-sm text-muted-foreground">
+                        All optional. Add the score later if you don't know it
+                        yet.
+                    </p>
                     <InputError
                         className="col-span-3"
                         message={

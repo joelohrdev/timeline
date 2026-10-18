@@ -172,16 +172,33 @@ test('a baseball game entry stores the opponent and both scores as numbers', fun
     expect(Entry::sole()->details)->toBe(['opponent' => 'Tigers', 'our_score' => 8, 'their_score' => 5]);
 });
 
-test('a baseball game entry requires both scores', function () {
+test('a baseball game can be posted without an opponent or score', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'category' => 'baseball_game'])
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($user)
+        ->post(route('entries.store'), [
+            'date' => '2026-10-18',
+            'category' => 'baseball_game',
+            'details' => ['opponent' => 'Tigers', 'our_score' => '', 'their_score' => ''],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::whereDate('date', '2026-10-17')->sole()->details)->toBe(['opponent' => null, 'our_score' => null, 'their_score' => null])
+        ->and(Entry::whereDate('date', '2026-10-18')->sole()->details)->toBe(['opponent' => 'Tigers', 'our_score' => null, 'their_score' => null]);
+});
+
+test('a baseball game score must still be a sensible number when given', function () {
     $this->actingAs(User::factory()->create())
         ->post(route('entries.store'), [
             'date' => '2026-10-17',
             'category' => 'baseball_game',
-            'details' => ['opponent' => 'Tigers', 'our_score' => '8'],
+            'details' => ['our_score' => 'lots'],
         ])
-        ->assertSessionHasErrors(['details.their_score' => 'The their score field is required.']);
-
-    expect(Entry::count())->toBe(0);
+        ->assertSessionHasErrors('details.our_score');
 });
 
 test('a birthday entry requires a name but not an age', function () {
