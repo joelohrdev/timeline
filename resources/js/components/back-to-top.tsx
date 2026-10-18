@@ -39,7 +39,7 @@ export function BackToTop() {
             tabIndex={visible ? 0 : -1}
             aria-hidden={!visible}
             className={cn(
-                'fixed right-4 bottom-4 z-40 size-11 rounded-full bg-background/90 shadow-md backdrop-blur transition duration-300 sm:right-6 sm:bottom-6',
+                'fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 z-40 size-11 rounded-full bg-background/90 shadow-md backdrop-blur transition duration-300 sm:right-6 sm:bottom-6 sm:left-auto',
                 visible
                     ? 'translate-y-0 opacity-100'
                     : 'pointer-events-none translate-y-3 opacity-0',

@@ -16,13 +16,15 @@ import { create } from '@/routes/entries';
 import type { User } from '@/types';
 
 export default function TimelineLayout({ children }: { children: ReactNode }) {
-    const { name, auth } = usePage().props;
+    const { props, component } = usePage();
+    const { name, auth } = props;
     const user = auth.user as User | null;
+    const onEntryForm = component.startsWith('entries/');
     const getInitials = useInitials();
 
     return (
         <div className="min-h-screen bg-paper text-ink">
-            <header>
+            <header className="pt-[env(safe-area-inset-top)]">
                 <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:h-20">
                     <Link
                         href={home()}
@@ -35,7 +37,11 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
 
                     {user ? (
                         <div className="flex items-center gap-2">
-                            <Button asChild size="sm">
+                            <Button
+                                asChild
+                                size="sm"
+                                className="hidden sm:inline-flex"
+                            >
                                 <Link href={create()}>
                                     <Plus />
                                     New entry
@@ -77,9 +83,19 @@ export default function TimelineLayout({ children }: { children: ReactNode }) {
                 </div>
             </header>
 
-            <main className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:pt-10">
+            <main className="mx-auto max-w-5xl px-4 pt-6 pb-24 sm:pt-10 sm:pb-10">
                 {children}
             </main>
+
+            {user && !onEntryForm && (
+                <Link
+                    href={create()}
+                    aria-label="New entry"
+                    className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 grid size-14 place-items-center rounded-full bg-ink text-paper shadow-lg transition focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper focus-visible:outline-none active:scale-95 sm:hidden"
+                >
+                    <Plus className="size-6" />
+                </Link>
+            )}
         </div>
     );
 }
