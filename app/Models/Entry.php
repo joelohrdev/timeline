@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Actions\SanitizeEntryBody;
 use Database\Factories\EntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,6 +46,16 @@ class Entry extends Model
         return [
             'date' => 'date:Y-m-d',
         ];
+    }
+
+    /**
+     * Store only sanitized editor HTML.
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function body(): Attribute
+    {
+        return Attribute::set(fn (?string $value): ?string => app(SanitizeEntryBody::class)->handle($value));
     }
 
     /**

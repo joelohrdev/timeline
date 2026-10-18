@@ -1,9 +1,10 @@
 import { Form, router } from '@inertiajs/react';
 import { ImagePlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { DatePicker } from '@/components/date-picker';
 import InputError from '@/components/input-error';
+import { RichTextEditor } from '@/components/rich-text-editor';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import type { Entry } from '@/types';
@@ -50,26 +51,22 @@ export function EntryForm({ form, entry, defaultDate, submitLabel }: Props) {
                 <>
                     <div className="grid gap-2">
                         <Label htmlFor="date">Day</Label>
-                        <Input
+                        <DatePicker
                             id="date"
-                            type="date"
                             name="date"
                             defaultValue={entry?.date ?? defaultDate}
-                            required
-                            className="w-auto"
+                            invalid={Boolean(errors.date)}
                         />
                         <InputError message={errors.date} />
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="body">What happened</Label>
-                        <textarea
+                        <RichTextEditor
                             id="body"
                             name="body"
-                            rows={6}
                             defaultValue={entry?.body ?? ''}
-                            placeholder="Walked the river trail before work…"
-                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
+                            invalid={Boolean(errors.body)}
                         />
                         <InputError message={errors.body} />
                     </div>

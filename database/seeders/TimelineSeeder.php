@@ -5,8 +5,10 @@ namespace Database\Seeders;
 use App\Actions\StoreEntryImage;
 use App\Models\Entry;
 use App\Models\User;
+use GdImage;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
+use RuntimeException;
 
 class TimelineSeeder extends Seeder
 {
@@ -16,18 +18,18 @@ class TimelineSeeder extends Seeder
      * @var list<string|null>
      */
     private const array Bodies = [
-        'Walked the river trail before work. First frost on the bridge rails and the light came in sideways through the trees.',
-        'Quiet day. Finished the bookshelf.',
-        "Farmers market in the morning, then soup for the week.\nThe squash guy remembered us.",
-        'Long drive out to the lake. Nobody else there.',
-        'Rain all afternoon. Read on the porch until it got too cold.',
+        '<p>Walked the river trail before work. <strong>First frost</strong> on the bridge rails and the light came in sideways through the trees.</p>',
+        '<p>Quiet day. Finished the bookshelf.</p>',
+        '<p>Farmers market in the morning, then soup for the week:</p><ul><li><p>butternut squash</p></li><li><p>leeks</p></li><li><p>too much bread</p></li></ul><p>The squash guy remembered us.</p>',
+        '<p>Long drive out to the lake. Nobody else there.</p>',
+        '<p>Rain all afternoon. Read on the porch until it got too cold.</p><blockquote><p>The best time to plant a tree was twenty years ago.</p></blockquote>',
         null,
-        'Tried the new coffee place on 5th. Good espresso, terrible chairs.',
-        'Sunset from the parking garage roof, of all places.',
-        "Kids' soccer. We lost 4–1 but everyone got orange slices.",
-        'Fixed the gate latch, finally.',
+        '<p>Tried the new coffee place on 5th. <em>Good espresso, terrible chairs.</em></p>',
+        '<p>Sunset from the parking garage roof, of all places.</p>',
+        '<p>Kids\' soccer. We lost 4–1 but everyone got orange slices.</p>',
+        '<p>Fixed the gate latch, finally.</p>',
         null,
-        'Hiked to the overlook. Fog sat in the valley the whole time and never burned off.',
+        '<p>Hiked to the <a href="https://www.nps.gov">overlook</a>. Fog sat in the valley the whole time and never burned off.</p><ol><li><p>Trailhead at 7</p></li><li><p>Summit by 9</p></li><li><p>Pancakes by 11</p></li></ol>',
     ];
 
     /**
@@ -90,22 +92,21 @@ class TimelineSeeder extends Seeder
 
         for ($y = 0; $y < $height; $y++) {
             $ratio = $y / $height;
-            $color = imagecolorallocate(
-                $image,
-                (int) ($skyTop[0] + ($skyBottom[0] - $skyTop[0]) * $ratio),
-                (int) ($skyTop[1] + ($skyBottom[1] - $skyTop[1]) * $ratio),
-                (int) ($skyTop[2] + ($skyBottom[2] - $skyTop[2]) * $ratio),
-            );
+            $color = $this->color($image, [
+                $skyTop[0] + ($skyBottom[0] - $skyTop[0]) * $ratio,
+                $skyTop[1] + ($skyBottom[1] - $skyTop[1]) * $ratio,
+                $skyTop[2] + ($skyBottom[2] - $skyTop[2]) * $ratio,
+            ]);
             imageline($image, 0, $y, $width, $y, $color);
         }
 
-        $sun = imagecolorallocatealpha($image, 255, 245, 225, 30);
+        $sun = $this->color($image, [255, 245, 225], alpha: 30);
         $sunSize = (int) ($width * fake()->randomFloat(2, 0.08, 0.16));
         imagefilledellipse($image, fake()->numberBetween($sunSize, $width - $sunSize), (int) ($height * 0.45), $sunSize, $sunSize, $sun);
 
         foreach ([0.62, 0.72, 0.84] as $layer => $horizon) {
             $shade = 1 - (2 - $layer) * 0.18;
-            $color = imagecolorallocate($image, (int) ($ground[0] * $shade), (int) ($ground[1] * $shade), (int) ($ground[2] * $shade));
+            $color = $this->color($image, [$ground[0] * $shade, $ground[1] * $shade, $ground[2] * $shade]);
             $points = [0, $height];
 
             for ($x = 0; $x <= $width; $x += (int) ($width / 8)) {
@@ -121,5 +122,30 @@ class TimelineSeeder extends Seeder
         imagejpeg($image, $path, 90);
 
         return new UploadedFile($path, basename($path), 'image/jpeg', null, true);
+    }
+
+    /**
+     * Allocate a colour, clamping each channel to the 0–255 range GD accepts.
+     *
+     * @param  array{int|float, int|float, int|float}  $rgb
+     * @param  int<0, 127>  $alpha
+     */
+    private function color(GdImage $image, array $rgb, int $alpha = 0): int
+    {
+        $color = imagecolorallocatealpha($image, $this->channel($rgb[0]), $this->channel($rgb[1]), $this->channel($rgb[2]), $alpha);
+
+        if ($color === false) {
+            throw new RuntimeException('Could not allocate a colour for the seed image.');
+        }
+
+        return $color;
+    }
+
+    /**
+     * @return int<0, 255>
+     */
+    private function channel(int|float $value): int
+    {
+        return max(0, min(255, (int) round($value)));
     }
 }

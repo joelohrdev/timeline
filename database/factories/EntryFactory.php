@@ -21,7 +21,7 @@ class EntryFactory extends Factory
         return [
             'user_id' => User::factory(),
             'date' => fake()->unique()->date(),
-            'body' => fake()->paragraph(),
+            'body' => '<p>'.fake()->paragraph().'</p>',
         ];
     }
 }

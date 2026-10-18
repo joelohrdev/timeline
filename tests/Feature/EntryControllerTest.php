@@ -109,3 +109,25 @@ test('deleting an entry removes its image files', function () {
     expect($entry->fresh())->toBeNull();
     $this->disk->assertMissing([$image->path, $image->thumb_path]);
 });
+
+test('entry text keeps editor formatting but drops scripts and unsafe links', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), [
+            'date' => '2026-10-17',
+            'body' => '<p>A <strong>good</strong> day<script>alert(1)</script> <a href="javascript:alert(1)" onclick="steal()">trap</a> <a href="https://example.com">link</a></p>',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->body)->toBe(
+        '<p>A <strong>good</strong> day <a rel="noopener noreferrer nofollow" target="_blank">trap</a> '
+        .'<a href="https://example.com" rel="noopener noreferrer nofollow" target="_blank">link</a></p>'
+    );
+});
+
+test('an editor body with no text is stored as empty', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('entries.store'), ['date' => '2026-10-17', 'body' => '<p></p>'])
+        ->assertSessionHasNoErrors();
+
+    expect(Entry::sole()->body)->toBeNull();
+});

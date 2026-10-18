@@ -109,9 +109,10 @@ export function TimelineEntry({
                 )}
 
                 {entry.body && (
-                    <p className="mt-4 text-[15px] leading-7 whitespace-pre-line">
-                        {entry.body}
-                    </p>
+                    <div
+                        className="rich-text mt-4 text-[15px] leading-7"
+                        dangerouslySetInnerHTML={{ __html: entry.body }}
+                    />
                 )}
 
                 {canEdit && (

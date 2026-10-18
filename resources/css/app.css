@@ -141,3 +141,29 @@
         @apply bg-background text-foreground;
     }
 }
+
+@layer components {
+    .rich-text > * + * {
+        @apply mt-3;
+    }
+
+    .rich-text ul {
+        @apply list-disc pl-5;
+    }
+
+    .rich-text ol {
+        @apply list-decimal pl-5;
+    }
+
+    .rich-text li + li {
+        @apply mt-1;
+    }
+
+    .rich-text blockquote {
+        @apply border-l-2 border-border pl-4 text-muted-foreground italic;
+    }
+
+    .rich-text a {
+        @apply underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground;
+    }
+}
