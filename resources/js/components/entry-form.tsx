@@ -44,6 +44,9 @@ type DuplicateOf = {
     label: string;
 };
 
+/** The most photos one event can hold, matching the server's validation. */
+const MaxPhotos = 10;
+
 type ChosenPhoto = {
     file: File;
     url: string;
@@ -117,6 +120,7 @@ export function EntryForm({
               : null);
     const photoCount = existingImages.length + chosen.length;
     const duplicateCount = chosen.filter((photo) => photo.duplicateOf).length;
+    const photosOverLimit = Math.max(0, photoCount - MaxPhotos);
     const photoDrop = usePhotoDrop((photos) => void addFiles(photos));
 
     useEffect(() => {
@@ -365,6 +369,10 @@ export function EntryForm({
             ref={formRef}
             options={{ preserveScroll: 'errors' }}
             onBefore={() => {
+                if (photosOverLimit > 0) {
+                    return false;
+                }
+
                 if (
                     eventsThatDay.length > 0 &&
                     chosenRef.current.length > 0 &&
@@ -599,7 +607,8 @@ export function EntryForm({
                                       : 'Choose or drop photos'}
                             </span>
                             <span className="text-xs">
-                                JPG, PNG, WebP, HEIC or ProRAW, saved as WebP
+                                Up to {MaxPhotos} · JPG, PNG, WebP, HEIC or
+                                ProRAW, saved as WebP
                             </span>
                         </label>
                         {photoDrop.ignored > 0 && (
@@ -647,6 +656,13 @@ export function EntryForm({
                             </p>
                         )}
                         <InputError message={rawError ?? undefined} />
+                        <InputError
+                            message={
+                                photosOverLimit > 0
+                                    ? `An event can hold up to ${MaxPhotos} photos. Remove ${photosOverLimit === 1 ? '1 photo' : `${photosOverLimit} photos`} to save.`
+                                    : undefined
+                            }
+                        />
                         <InputError message={errors.images} />
                         <InputError message={errors.cover} />
                         {Object.entries(errors)
@@ -665,7 +681,10 @@ export function EntryForm({
                         />
                     )}
 
-                    <Button type="submit" disabled={processing}>
+                    <Button
+                        type="submit"
+                        disabled={processing || photosOverLimit > 0}
+                    >
                         {processing ? 'Saving…' : submitLabel}
                     </Button>
 
