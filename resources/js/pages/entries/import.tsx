@@ -9,11 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePhotoDrop } from '@/hooks/use-photo-drop';
 import { parseEntryDate, todayKey } from '@/lib/dates';
-import { photoLocation, photoTakenAt } from '@/lib/photo-date';
 import type { PhotoLocation } from '@/lib/photo-date';
-import { photoFingerprint } from '@/lib/photo-fingerprint';
 import { postForm, postJson } from '@/lib/post-json';
-import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
+import { readPhotoBatch } from '@/lib/read-photo';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { store as postDraft } from '@/routes/entries/import';
@@ -115,9 +113,13 @@ export default function ImportPhotos({
 }) {
     const [drafts, setDrafts] = useState<Draft[]>([]);
     const [reading, setReading] = useState<{
+        stage: 'reading' | 'checking';
         done: number;
         total: number;
     } | null>(null);
+    // Between tapping "Choose photos" and the photos arriving: iCloud photos download to the phone first.
+    const [waitingForPicker, setWaitingForPicker] = useState(false);
+    const fileInput = useRef<HTMLInputElement>(null);
     const [skipped, setSkipped] = useState({ duplicates: 0, unreadable: 0 });
     const [posting, setPosting] = useState(false);
     const urls = useRef<string[]>([]);
@@ -126,6 +128,14 @@ export default function ImportPhotos({
     useEffect(() => {
         return () => urls.current.forEach((url) => URL.revokeObjectURL(url));
     }, []);
+
+    useEffect(() => {
+        const input = fileInput.current;
+        const stopWaiting = () => setWaitingForPicker(false);
+        input?.addEventListener('cancel', stopWaiting);
+
+        return () => input?.removeEventListener('cancel', stopWaiting);
+    }, [drafts.length, reading]);
 
     const update = (id: string, changes: Partial<Draft>) =>
         setDrafts((current) =>
@@ -141,39 +151,37 @@ export default function ImportPhotos({
             return;
         }
 
-        setReading({ done: 0, total: chosen.length });
+        setWaitingForPicker(false);
+        setReading({ stage: 'reading', done: 0, total: chosen.length });
+
+        const results = await readPhotoBatch(chosen, (done) =>
+            setReading({ stage: 'reading', done, total: chosen.length }),
+        );
         const read: ImportPhoto[] = [];
         let unreadable = 0;
 
-        for (const file of chosen) {
-            const [taken, fingerprint, gps] = await Promise.all([
-                photoTakenAt(file),
-                photoFingerprint(file),
-                photoLocation(file),
-            ]);
-            const upload = isRawPhoto(file) ? await rawPhotoToJpeg(file) : file;
-
-            if (upload) {
-                const url = URL.createObjectURL(upload);
-                urls.current.push(url);
-                read.push({
-                    url,
-                    file: upload,
-                    fingerprint,
-                    takenDate: taken?.date ?? null,
-                    takenKey: taken?.key.includes('.') ? taken.key : null,
-                    takenStamp: taken?.key ?? null,
-                    gps,
-                });
-            } else {
+        for (const result of results) {
+            if (!result) {
                 unreadable++;
+                continue;
             }
 
-            setReading({
-                done: read.length + unreadable,
-                total: chosen.length,
+            const url = URL.createObjectURL(result.upload);
+            urls.current.push(url);
+            read.push({
+                url,
+                file: result.upload,
+                fingerprint: result.fingerprint,
+                takenDate: result.taken?.date ?? null,
+                takenKey: result.taken?.key.includes('.')
+                    ? result.taken.key
+                    : null,
+                takenStamp: result.taken?.key ?? null,
+                gps: result.gps,
             });
         }
+
+        setReading({ stage: 'checking', done: 0, total: read.length });
 
         const alreadyPosted = new Set<string>();
 
@@ -323,10 +331,12 @@ export default function ImportPhotos({
                         JPG, PNG, WebP, HEIC or ProRAW
                     </span>
                     <input
+                        ref={fileInput}
                         id="import-photos"
                         type="file"
                         multiple
                         accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/x-adobe-dng,image/dng,.heic,.heif,.dng"
+                        onClick={() => setWaitingForPicker(true)}
                         onChange={(event) =>
                             void readPhotos(event.target.files)
                         }
@@ -343,10 +353,25 @@ export default function ImportPhotos({
                 </p>
             )}
 
+            {waitingForPicker && !reading && (
+                <div className="mt-4 text-sm text-muted-foreground">
+                    <p className="flex items-center gap-2">
+                        <Loader2 className="size-4 animate-spin" />
+                        Waiting for your photos…
+                    </p>
+                    <p className="mt-1">
+                        Photos stored in iCloud download to your phone first,
+                        which can take a few minutes for a big batch.
+                    </p>
+                </div>
+            )}
+
             {reading && (
                 <p className="mt-8 flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                    Reading {reading.done} of {reading.total} photos…
+                    {reading.stage === 'reading'
+                        ? `Reading ${reading.done} of ${reading.total} photos…`
+                        : 'Checking which photos are already on your timeline…'}
                 </p>
             )}
 
@@ -355,7 +380,7 @@ export default function ImportPhotos({
                     {skipped.duplicates > 0 &&
                         `${skipped.duplicates === 1 ? '1 photo is' : `${skipped.duplicates} photos are`} already on your timeline and ${skipped.duplicates === 1 ? 'was' : 'were'} left out. `}
                     {skipped.unreadable > 0 &&
-                        `${skipped.unreadable === 1 ? '1 RAW photo' : `${skipped.unreadable} RAW photos`} couldn't be read; export ${skipped.unreadable === 1 ? 'it' : 'them'} as JPEG or HEIC.`}
+                        `${skipped.unreadable === 1 ? '1 photo' : `${skipped.unreadable} photos`} couldn't be read; export ${skipped.unreadable === 1 ? 'it' : 'them'} as JPEG or HEIC.`}
                 </p>
             )}
 

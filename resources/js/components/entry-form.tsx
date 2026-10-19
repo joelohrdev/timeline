@@ -21,11 +21,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { parseEntryDate } from '@/lib/dates';
-import { photoLocation, photoTakenAt } from '@/lib/photo-date';
+import { photoLocation } from '@/lib/photo-date';
 import type { PhotoLocation } from '@/lib/photo-date';
-import { photoFingerprint } from '@/lib/photo-fingerprint';
 import { postJson } from '@/lib/post-json';
-import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
+import { readPhotoBatch } from '@/lib/read-photo';
 import { cn } from '@/lib/utils';
 import { destroy as destroyImage } from '@/routes/entries/images';
 import { check as checkPhotos } from '@/routes/photos';
@@ -156,36 +155,32 @@ export function EntryForm({
 
         setRawError(null);
 
-        if (added.some(isRawPhoto)) {
-            setPreparingRaw(true);
-        }
+        setPreparingRaw(added.length > 0);
 
         const prepared: ChosenPhoto[] = [];
         const unreadable: string[] = [];
 
-        for (const file of added) {
-            // Fingerprint and taken time come from the original file, before any RAW conversion.
-            const [taken, fingerprint] = await Promise.all([
-                photoTakenAt(file),
-                photoFingerprint(file),
-            ]);
-            const upload = isRawPhoto(file) ? await rawPhotoToJpeg(file) : file;
+        const results = await readPhotoBatch(added);
 
-            if (!upload) {
-                unreadable.push(file.name);
-                continue;
+        results.forEach((result, index) => {
+            if (!result) {
+                unreadable.push(added[index].name);
+
+                return;
             }
 
             prepared.push({
-                file: upload,
-                url: URL.createObjectURL(upload),
-                fingerprint,
-                takenDate: taken?.date ?? null,
-                takenKey: taken?.key.includes('.') ? taken.key : null,
-                takenStamp: taken?.key ?? null,
+                file: result.upload,
+                url: URL.createObjectURL(result.upload),
+                fingerprint: result.fingerprint,
+                takenDate: result.taken?.date ?? null,
+                takenKey: result.taken?.key.includes('.')
+                    ? result.taken.key
+                    : null,
+                takenStamp: result.taken?.key ?? null,
                 duplicateOf: null,
             });
-        }
+        });
 
         setPreparingRaw(false);
 
@@ -652,7 +647,7 @@ export function EntryForm({
 
                         {preparingRaw && (
                             <p className="text-sm text-muted-foreground">
-                                Preparing RAW photos…
+                                Reading photos…
                             </p>
                         )}
                         <InputError message={rawError ?? undefined} />
