@@ -7,6 +7,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { usePhotoDrop } from '@/hooks/use-photo-drop';
 import { parseEntryDate, todayKey } from '@/lib/dates';
 import { photoLocation, photoTakenAt } from '@/lib/photo-date';
 import type { PhotoLocation } from '@/lib/photo-date';
@@ -120,6 +121,7 @@ export default function ImportPhotos({
     const [skipped, setSkipped] = useState({ duplicates: 0, unreadable: 0 });
     const [posting, setPosting] = useState(false);
     const urls = useRef<string[]>([]);
+    const photoDrop = usePhotoDrop((photos) => void readPhotos(photos));
 
     useEffect(() => {
         return () => urls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -132,7 +134,7 @@ export default function ImportPhotos({
             ),
         );
 
-    const readPhotos = async (files: FileList | null) => {
+    const readPhotos = async (files: FileList | File[] | null) => {
         const chosen = Array.from(files ?? []);
 
         if (chosen.length === 0) {
@@ -304,10 +306,19 @@ export default function ImportPhotos({
             {drafts.length === 0 && !reading && (
                 <label
                     htmlFor="import-photos"
-                    className="mt-8 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input px-4 py-12 text-sm text-muted-foreground hover:border-ring hover:text-foreground"
+                    {...photoDrop.dropProps}
+                    className={cn(
+                        'mt-8 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input px-4 py-12 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground',
+                        photoDrop.isDragging &&
+                            'border-ring bg-muted text-foreground',
+                    )}
                 >
                     <ImagePlus className="size-6" />
-                    <span>Choose photos</span>
+                    <span>
+                        {photoDrop.isDragging
+                            ? 'Drop photos to import them'
+                            : 'Choose or drop photos'}
+                    </span>
                     <span className="text-xs">
                         JPG, PNG, WebP, HEIC or ProRAW
                     </span>
@@ -322,6 +333,14 @@ export default function ImportPhotos({
                         className="sr-only"
                     />
                 </label>
+            )}
+
+            {photoDrop.ignored > 0 && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                    {photoDrop.ignored === 1
+                        ? 'Skipped 1 file that isn’t a photo.'
+                        : `Skipped ${photoDrop.ignored} files that aren’t photos.`}
+                </p>
             )}
 
             {reading && (

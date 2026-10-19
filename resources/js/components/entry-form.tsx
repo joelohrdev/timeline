@@ -2,6 +2,7 @@ import { Form, router } from '@inertiajs/react';
 import type { FormComponentRef } from '@inertiajs/core';
 import { ImagePlus, Star, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { usePhotoDrop } from '@/hooks/use-photo-drop';
 import { CategoryFields } from '@/components/category-fields';
 import type { CategoryOptions } from '@/components/category-fields';
 import { DatePicker } from '@/components/date-picker';
@@ -116,6 +117,7 @@ export function EntryForm({
               : null);
     const photoCount = existingImages.length + chosen.length;
     const duplicateCount = chosen.filter((photo) => photo.duplicateOf).length;
+    const photoDrop = usePhotoDrop((photos) => void addFiles(photos));
 
     useEffect(() => {
         return () =>
@@ -139,7 +141,7 @@ export function EntryForm({
         setChosen(next);
     };
 
-    const addFiles = async (files: FileList | null) => {
+    const addFiles = async (files: FileList | File[] | null) => {
         const added = Array.from(files ?? []);
         const isFirstPick = chosenRef.current.length === 0;
         const selection = ++latestSelection.current;
@@ -581,18 +583,32 @@ export function EntryForm({
 
                         <label
                             htmlFor="images"
-                            className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input px-4 py-8 text-sm text-muted-foreground hover:border-ring hover:text-foreground"
+                            {...photoDrop.dropProps}
+                            className={cn(
+                                'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input px-4 py-8 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground',
+                                photoDrop.isDragging &&
+                                    'border-ring bg-muted text-foreground',
+                            )}
                         >
                             <ImagePlus className="size-5" />
                             <span>
-                                {photoCount > 0
-                                    ? 'Add more photos'
-                                    : 'Choose photos'}
+                                {photoDrop.isDragging
+                                    ? 'Drop photos to add them'
+                                    : photoCount > 0
+                                      ? 'Add more photos'
+                                      : 'Choose or drop photos'}
                             </span>
                             <span className="text-xs">
                                 JPG, PNG, WebP, HEIC or ProRAW, saved as WebP
                             </span>
                         </label>
+                        {photoDrop.ignored > 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                {photoDrop.ignored === 1
+                                    ? 'Skipped 1 file that isn’t a photo.'
+                                    : `Skipped ${photoDrop.ignored} files that aren’t photos.`}
+                            </p>
+                        )}
                         <input
                             ref={fileInput}
                             id="images"
