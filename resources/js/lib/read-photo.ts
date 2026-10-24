@@ -2,9 +2,10 @@ import { photoLocation, photoTakenAt } from '@/lib/photo-date';
 import type { PhotoLocation, PhotoTaken } from '@/lib/photo-date';
 import { photoFingerprint } from '@/lib/photo-fingerprint';
 import { isRawPhoto, rawPhotoToJpeg } from '@/lib/raw-photo';
+import { shrinkPhoto } from '@/lib/shrink-photo';
 
 export type ReadPhoto = {
-    /** The file to upload: the original, or a JPEG made from a RAW photo. */
+    /** The file to upload: the original, a downscaled JPEG of a large photo, or a JPEG made from a RAW photo. */
     upload: File;
     fingerprint: string;
     taken: PhotoTaken | null;
@@ -35,7 +36,9 @@ export async function readPhoto(file: File): Promise<ReadPhoto | null> {
             photoFingerprint(file),
             photoLocation(file),
         ]);
-        const upload = isRawPhoto(file) ? await rawPhotoToJpeg(file) : file;
+        const upload = isRawPhoto(file)
+            ? await rawPhotoToJpeg(file)
+            : await shrinkPhoto(file);
 
         return upload ? { upload, fingerprint, taken, gps } : null;
     };
